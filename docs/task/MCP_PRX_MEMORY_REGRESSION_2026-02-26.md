@@ -21,3 +21,7 @@
 - [x] 2026-02-26 Updated skill docs so clients can directly replicate main functional-line regression without relearning:
   - `skills/prx-memory-governance/SKILL.md` adds ordered online regression flow (capability, CRUD, dual-layer, maintenance, evolve, cleanup).
   - `skills/README.md` adds a regression shortcut sequence for Codex/Claude Code style clients.
+- [x] 2026-02-26 Updated `README.md` for integration clarity:
+  - removed maintainer line from top-level intro.
+  - replaced hardcoded local paths in MCP config example with `/your/path/to/...` placeholders.
+  - added third-party embedding/rerank key configuration section and env examples.

@@ -2,7 +2,6 @@
 
 `prx-memory` is a local-first MCP memory component for coding agents.
 It is designed to work across Codex, Claude Code, OpenClaw, OpenPRX, and other MCP-compatible clients without requiring a centralized memory service.
-Maintainer: `Andy.z`
 
 ## What It Provides
 
@@ -52,15 +51,57 @@ PRX_MEMORY_DB=./data/memory-db.json \
 {
   "mcpServers": {
     "prx_memory": {
-      "command": "/opt/worker/code/prx-memory/target/release/prx-memoryd",
+      "command": "/your/path/to/prx-memory/target/release/prx-memoryd",
       "env": {
         "PRX_MEMORYD_TRANSPORT": "stdio",
         "PRX_MEMORY_BACKEND": "json",
-        "PRX_MEMORY_DB": "/opt/worker/code/prx-memory/data/memory-db.json"
+        "PRX_MEMORY_DB": "/your/path/to/prx-memory/data/memory-db.json"
       }
     }
   }
 }
+```
+
+Use your real local path for both `command` and `PRX_MEMORY_DB`.
+
+## Third-Party Key Configuration
+
+Remote semantic recall and rerank need provider keys.
+
+### Embedding providers
+
+- `PRX_EMBED_PROVIDER=openai-compatible|jina|gemini`
+- Common key/model vars:
+  - `PRX_EMBED_API_KEY`
+  - `PRX_EMBED_MODEL`
+  - `PRX_EMBED_BASE_URL` (optional)
+- Provider fallback keys:
+  - `JINA_API_KEY` (for `jina`)
+  - `GEMINI_API_KEY` (for `gemini`)
+
+### Rerank providers
+
+- `PRX_RERANK_PROVIDER=jina|cohere|pinecone|pinecone-compatible|none`
+- Common key/model vars:
+  - `PRX_RERANK_API_KEY`
+  - `PRX_RERANK_MODEL`
+  - `PRX_RERANK_ENDPOINT`
+  - `PRX_RERANK_API_VERSION` (pinecone-compatible only)
+- Provider fallback keys:
+  - `JINA_API_KEY`
+  - `COHERE_API_KEY`
+  - `PINECONE_API_KEY`
+
+### Example env block (replace with your real values)
+
+```bash
+PRX_EMBED_PROVIDER=jina
+PRX_EMBED_API_KEY=your_embed_key
+PRX_EMBED_MODEL=jina-embeddings-v5-text-small
+
+PRX_RERANK_PROVIDER=cohere
+PRX_RERANK_API_KEY=your_rerank_key
+PRX_RERANK_MODEL=rerank-v3.5
 ```
 
 ## Skills and Templates

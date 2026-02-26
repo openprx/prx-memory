@@ -21,6 +21,10 @@
     kept skill-local helper scripts and added repository-level regression scripts
     (`run_multi_client_validation.sh`, `run_holdout_regression.sh`, `run_soak_http.sh`, `run_perf_100k.sh`).
   - `skills/README.md` now exposes a one-pass regression shortcut sequence for MCP clients.
+- Updated `README.md` integration guidance:
+  - removed maintainer line from the project introduction.
+  - replaced hardcoded `/opt/worker/code/...` example paths with `/your/path/to/...` placeholders.
+  - added a dedicated third-party key configuration section for embedding/rerank providers with env examples.
 - Added task execution record:
   - `docs/task/MCP_PRX_MEMORY_REGRESSION_2026-02-26.md`.
 - Expanded `AGENTS.md` with project-level overview and MCP surface quick reference (purpose, transport modes, tool groups, resources/templates, and doc entry points).
