@@ -1,0 +1,44 @@
+[
+  {
+    "name": "generalization_win",
+    "parent_score": 0.70,
+    "lambda": 0.2,
+    "mu": 0.2,
+    "candidates": [
+      {
+        "id": "safe_upgrade",
+        "score_train": 0.82,
+        "score_holdout": 0.80,
+        "cost_penalty": 0.01,
+        "risk_penalty": 0.01,
+        "constraints_satisfied": true
+      },
+      {
+        "id": "overfit_variant",
+        "score_train": 0.90,
+        "score_holdout": 0.65,
+        "cost_penalty": 0.01,
+        "risk_penalty": 0.01,
+        "constraints_satisfied": true
+      }
+    ],
+    "expected_accepted_variant_id": "safe_upgrade"
+  },
+  {
+    "name": "constraint_reject",
+    "parent_score": 0.71,
+    "lambda": 0.2,
+    "mu": 0.2,
+    "candidates": [
+      {
+        "id": "unsafe_fast",
+        "score_train": 0.88,
+        "score_holdout": 0.86,
+        "cost_penalty": 0.01,
+        "risk_penalty": 0.01,
+        "constraints_satisfied": false
+      }
+    ],
+    "expected_accepted_variant_id": null
+  }
+]

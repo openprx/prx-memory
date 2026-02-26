@@ -1,0 +1,26 @@
+[package]
+name = "prx-memory-storage"
+version = "0.1.0"
+edition = "2021"
+description = "Local persistent storage engine for prx-memory"
+license = "MIT"
+
+[features]
+default = []
+lancedb-backend = [
+    "dep:lancedb",
+    "dep:tokio",
+    "dep:arrow-array",
+    "dep:arrow-schema",
+    "dep:futures",
+]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+lancedb = { version = "0.26.2", optional = true, default-features = false }
+tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
+arrow-array = { version = "57.3.0", optional = true }
+arrow-schema = { version = "57.3.0", optional = true }
+futures = { version = "0.3", optional = true }

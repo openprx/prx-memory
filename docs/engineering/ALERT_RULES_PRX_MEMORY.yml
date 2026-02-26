@@ -1,0 +1,30 @@
+groups:
+  - name: prx-memory-alerts
+    interval: 30s
+    rules:
+      - alert: PrxMemoryToolErrorRatioHigh
+        expr: prx_memory_tool_error_ratio >= 0.20
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "prx-memory tool error ratio is high"
+          description: "tool_error_ratio={{ $value }} exceeded 0.20 for 5 minutes"
+
+      - alert: PrxMemoryRemoteRerankWarningsHigh
+        expr: prx_memory_recall_remote_rerank_warning_ratio >= 0.60
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "prx-memory remote rerank warning ratio is high"
+          description: "remote_warning_ratio={{ $value }} exceeded 0.60 for 10 minutes"
+
+      - alert: PrxMemoryMetricsCardinalityOverflow
+        expr: sum(prx_memory_metrics_label_overflow_total) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "prx-memory metrics label cardinality overflow detected"
+          description: "at least one metrics dimension exceeded configured label limits"

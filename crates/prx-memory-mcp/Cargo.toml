@@ -1,0 +1,24 @@
+[package]
+name = "prx-memory-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "Local MCP server surface for prx-memory"
+license = "MIT"
+authors = ["Andy.z"]
+
+[features]
+default = []
+lancedb-backend = ["prx-memory-storage/lancedb-backend"]
+
+[dependencies]
+prx-memory-core = { path = "../prx-memory-core" }
+prx-memory-embed = { path = "../prx-memory-embed" }
+prx-memory-rerank = { path = "../prx-memory-rerank" }
+prx-memory-skill = { path = "../prx-memory-skill" }
+prx-memory-storage = { path = "../prx-memory-storage" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+
+[dev-dependencies]

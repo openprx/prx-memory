@@ -1,0 +1,8 @@
+[package]
+name = "prx-memory-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core scoring/evolution domain primitives for prx-memory"
+license = "MIT"
+
+[dependencies]

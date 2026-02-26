@@ -1,0 +1,77 @@
+{
+  "title": "prx-memory Observability",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Tool Error Ratio",
+      "targets": [
+        {
+          "expr": "prx_memory_tool_error_ratio"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tool Calls by Status",
+      "targets": [
+        {
+          "expr": "sum by (tool,status) (prx_memory_tool_calls_total)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Recall Stage Latency Max",
+      "targets": [
+        {
+          "expr": "prx_memory_recall_stage_latency_ms_max"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Remote Warning Ratio",
+      "targets": [
+        {
+          "expr": "prx_memory_recall_remote_rerank_warning_ratio"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Session Activity",
+      "targets": [
+        {
+          "expr": "prx_memory_sessions_active"
+        },
+        {
+          "expr": "rate(prx_memory_sessions_created_total[5m])"
+        },
+        {
+          "expr": "rate(prx_memory_sessions_expired_total[5m])"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Metrics Label Overflow",
+      "targets": [
+        {
+          "expr": "sum(prx_memory_metrics_label_overflow_total)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Alert States",
+      "targets": [
+        {
+          "expr": "prx_memory_alert_state"
+        }
+      ]
+    }
+  ]
+}

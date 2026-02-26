@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "crates/prx-memory-core",
+    "crates/prx-memory-embed",
+    "crates/prx-memory-rerank",
+    "crates/prx-memory-skill",
+    "crates/prx-memory-ai",
+    "crates/prx-memory-mcp",
+    "crates/prx-memory-storage",
+]
+resolver = "2"

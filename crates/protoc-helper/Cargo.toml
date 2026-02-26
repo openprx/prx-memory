@@ -1,0 +1,7 @@
+[package]
+name = "protoc-helper"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+protoc-bin-vendored = "3"

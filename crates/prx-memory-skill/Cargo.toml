@@ -1,0 +1,8 @@
+[package]
+name = "prx-memory-skill"
+version = "0.1.0"
+edition = "2021"
+description = "Built-in governance skill payloads for prx-memory"
+license = "MIT"
+
+[dependencies]

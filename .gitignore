@@ -1,0 +1,49 @@
+# Build artifacts
+/target/
+**/target/
+*.pdb
+*.profraw
+*.profdata
+coverage/
+lcov.info
+
+# Rust lockfile policy
+# Keep Cargo.lock for reproducible application/service builds.
+# If you later split out publishable library crates only, revisit this choice.
+# Cargo.lock
+
+# Runtime data (local state; do not publish)
+data/*
+!data/holdout/
+!data/holdout/**
+crates/prx-memory-mcp/data/
+
+# Local database / vector index artifacts
+*.lance
+*.txn
+*.manifest
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.local
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Logs and temp files
+*.log
+logs/
+*.tmp
+*.swp
+*.swo
+
+# Local planning notes
+need.md
+
+# Generated API docs (if produced locally)
+api-docs/
