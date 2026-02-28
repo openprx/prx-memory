@@ -73,11 +73,11 @@ jobs:
 
       - name: Build (cross)
         if: matrix.use_cross
-        run: cross build --release -p prx-memory-mcp --target ${{ matrix.target }}
+        run: cross build --release -p prx-memory-mcp --features lancedb-backend --target ${{ matrix.target }}
 
       - name: Build (native)
         if: "!matrix.use_cross"
-        run: cargo build --release -p prx-memory-mcp --target ${{ matrix.target }}
+        run: cargo build --release -p prx-memory-mcp --features lancedb-backend --target ${{ matrix.target }}
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
