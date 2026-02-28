@@ -1282,7 +1282,8 @@ impl McpServer {
             Ok(v) => v,
             Err(msg) => return JsonRpcResponse::error(id, -32602, msg),
         };
-        let entry = outcome.entry;
+        let mut entry = outcome.entry;
+        entry.embedding = None;
         let mut structured_content = match serde_json::to_value(&entry) {
             Ok(v) => v,
             Err(_) => json!({}),
@@ -1468,12 +1469,19 @@ impl McpServer {
         .flatten()
         .collect::<Vec<_>>();
 
+        let mut tech_clean = technical.entry;
+        tech_clean.embedding = None;
+        let principle_clean = principle.as_ref().map(|v| {
+            let mut e = v.entry.clone();
+            e.embedding = None;
+            e
+        });
         JsonRpcResponse::success(
             id,
             json!({
                 "structuredContent": {
-                    "technical": technical.entry,
-                    "principle": principle.as_ref().map(|v| v.entry.clone()),
+                    "technical": tech_clean,
+                    "principle": principle_clean,
                     "auto_maintenance": auto_maintenance,
                     "dual_layer_completed": true
                 },
@@ -1559,7 +1567,11 @@ impl McpServer {
                     "count": results.len(),
                     "warning": warning,
                     "agent_id": self.scopes.agent_id,
-                    "items": results.iter().map(|r| json!({"entry": r.entry, "score": r.score})).collect::<Vec<_>>()
+                    "items": results.iter().map(|r| {
+                        let mut e = r.entry.clone();
+                        e.embedding = None;
+                        json!({"entry": e, "score": r.score})
+                    }).collect::<Vec<_>>()
                 },
                 "content": [{
                     "type":"text",
@@ -1687,12 +1699,14 @@ impl McpServer {
             Err(err) => return JsonRpcResponse::error(id, -32001, err.to_string()),
         };
 
+        let mut updated_clean = updated;
+        updated_clean.embedding = None;
         JsonRpcResponse::success(
             id,
             json!({
                 "structuredContent": {
                     "replaced_id": args.id,
-                    "entry": updated
+                    "entry": updated_clean
                 },
                 "content": [{"type":"text", "text": "memory updated"}]
             }),
