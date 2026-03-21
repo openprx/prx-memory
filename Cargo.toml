@@ -9,3 +9,10 @@ members = [
     "crates/prx-memory-storage",
 ]
 resolver = "2"
+
+[workspace.package]
+authors = ["g1e2x87"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Embedding, reranking, and semantic memory for PRX agent"
+repository = "https://github.com/openprx/prx-memory"
