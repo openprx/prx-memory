@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Local MCP server surface for prx-memory"
 license = "MIT"
-authors = ["Andy.z"]
+authors = ["g1e2x87"]
 
 [features]
 default = []
