@@ -4035,6 +4035,7 @@ dependencies = [
 name = "prx-memory-mcp"
 version = "0.1.0"
 dependencies = [
+ "parking_lot",
  "prx-memory-core",
  "prx-memory-embed",
  "prx-memory-rerank",

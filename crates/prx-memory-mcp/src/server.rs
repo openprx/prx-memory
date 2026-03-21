@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::io::{self, BufRead, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
+
+use parking_lot::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use prx_memory_core::{EvolutionPolicy, EvolutionRunner, VariantCandidate};
@@ -28,6 +30,7 @@ use serde_json::{json, Value};
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse};
 
 const DEFAULT_MCP_PROTOCOL_VERSION: &str = "2024-11-05";
+const MAX_HTTP_BODY_SIZE: usize = 16 * 1024 * 1024; // 16 MiB
 
 pub struct McpServer {
     store: Arc<Mutex<Box<dyn StorageBackend>>>,
@@ -149,7 +152,6 @@ struct SessionEventPage {
 enum SessionAccessError {
     NotFound,
     Expired,
-    Poisoned,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -276,10 +278,10 @@ struct EmbedRuntime {
 }
 
 impl McpServer {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, String> {
         let db_path =
             std::env::var("PRX_MEMORY_DB").unwrap_or_else(|_| "./data/memory-db.json".to_string());
-        Self::with_db_path(db_path).expect("initialize storage for mcp server")
+        Self::with_db_path(db_path)
     }
 
     pub fn with_db_path(db_path: impl Into<String>) -> Result<Self, String> {
@@ -362,10 +364,7 @@ impl McpServer {
     }
 
     fn record_tool_metrics(&self, tool: &str, latency_ms: f64, is_error: bool) {
-        let mut locked = match self.metrics.lock() {
-            Ok(v) => v,
-            Err(_) => return,
-        };
+        let mut locked = self.metrics.lock();
         let metric = locked.tool.entry(tool.to_string()).or_default();
         if is_error {
             metric.err = metric.err.saturating_add(1);
@@ -377,10 +376,7 @@ impl McpServer {
     }
 
     fn record_recall_stage(&self, stage: &str, latency_ms: f64) {
-        let mut locked = match self.metrics.lock() {
-            Ok(v) => v,
-            Err(_) => return,
-        };
+        let mut locked = self.metrics.lock();
         let metric = locked.recall_stage.entry(stage.to_string()).or_default();
         metric.count = metric.count.saturating_add(1);
         metric.total_latency_ms += latency_ms;
@@ -393,10 +389,7 @@ impl McpServer {
         category: Option<&str>,
         rerank_provider: Option<&str>,
     ) {
-        let mut locked = match self.metrics.lock() {
-            Ok(v) => v,
-            Err(_) => return,
-        };
+        let mut locked = self.metrics.lock();
         locked
             .recall_scope
             .record(scope.unwrap_or("mixed_or_default_scope"));
@@ -409,13 +402,15 @@ impl McpServer {
     }
 
     fn record_remote_rerank_attempt(&self) {
-        if let Ok(mut locked) = self.metrics.lock() {
+        {
+            let mut locked = self.metrics.lock();
             locked.remote_rerank_attempts = locked.remote_rerank_attempts.saturating_add(1);
         }
     }
 
     fn record_remote_rerank_warning(&self) {
-        if let Ok(mut locked) = self.metrics.lock() {
+        {
+            let mut locked = self.metrics.lock();
             locked.remote_rerank_warnings = locked.remote_rerank_warnings.saturating_add(1);
         }
     }
@@ -424,21 +419,19 @@ impl McpServer {
         if count == 0 {
             return;
         }
-        if let Ok(mut locked) = self.metrics.lock() {
+        {
+            let mut locked = self.metrics.lock();
             locked.sessions_expired = locked.sessions_expired.saturating_add(count as u64);
         }
     }
 
     fn record_session_access_error(&self, err: SessionAccessError) {
-        if let Ok(mut locked) = self.metrics.lock() {
+        {
+            let mut locked = self.metrics.lock();
             match err {
                 SessionAccessError::NotFound | SessionAccessError::Expired => {
                     locked.session_access_not_found =
                         locked.session_access_not_found.saturating_add(1);
-                }
-                SessionAccessError::Poisoned => {
-                    locked.session_access_poisoned =
-                        locked.session_access_poisoned.saturating_add(1);
                 }
             }
         }
@@ -468,8 +461,9 @@ impl McpServer {
             "# TYPE prx_memory_alert_state gauge".to_string(),
         ];
 
-        let active_sessions = self.sessions.lock().map(|v| v.len()).unwrap_or(0);
-        if let Ok(locked) = self.metrics.lock() {
+        let active_sessions = self.sessions.lock().len();
+        {
+            let locked = self.metrics.lock();
             let mut total_calls = 0_u64;
             let mut total_errors = 0_u64;
             let mut tools = locked.tool.keys().cloned().collect::<Vec<_>>();
@@ -664,16 +658,8 @@ impl McpServer {
     }
 
     fn render_metrics_summary(&self) -> Value {
-        let active_sessions = self.sessions.lock().map(|v| v.len()).unwrap_or(0);
-        let locked = match self.metrics.lock() {
-            Ok(v) => v,
-            Err(_) => {
-                return json!({
-                    "status": "error",
-                    "message": "metrics lock poisoned"
-                })
-            }
-        };
+        let active_sessions = self.sessions.lock().len();
+        let locked = self.metrics.lock();
 
         let (total_calls, total_errors) = locked.tool.values().fold((0_u64, 0_u64), |acc, m| {
             (acc.0 + m.ok + m.err, acc.1 + m.err)
@@ -750,16 +736,13 @@ impl McpServer {
     }
 
     fn create_session(&self) -> (String, u64) {
-        let mut counter = self
-            .session_counter
-            .lock()
-            .expect("session counter lock poisoned");
+        let mut counter = self.session_counter.lock();
         let id = format!("sess-{}-{}", now_ms(), *counter);
         *counter = counter.saturating_add(1);
 
         let now = now_ms();
         let lease_expires_ms = now.saturating_add(Self::session_ttl_ms());
-        let mut sessions = self.sessions.lock().expect("sessions lock poisoned");
+        let mut sessions = self.sessions.lock();
         let expired = Self::cleanup_expired_sessions_locked(&mut sessions, now);
         self.record_session_expired(expired);
         sessions.insert(
@@ -772,7 +755,8 @@ impl McpServer {
                 lease_expires_ms,
             },
         );
-        if let Ok(mut locked) = self.metrics.lock() {
+        {
+            let mut locked = self.metrics.lock();
             locked.sessions_created = locked.sessions_created.saturating_add(1);
         }
         (id, lease_expires_ms)
@@ -780,10 +764,7 @@ impl McpServer {
 
     fn renew_session_lease(&self, session_id: &str) -> Result<u64, SessionAccessError> {
         let now = now_ms();
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| SessionAccessError::Poisoned)?;
+        let mut sessions = self.sessions.lock();
         let expired = Self::cleanup_expired_sessions_locked(&mut sessions, now);
         self.record_session_expired(expired);
         let Some(state) = sessions.get_mut(session_id) else {
@@ -795,7 +776,8 @@ impl McpServer {
         }
         state.last_touch_ms = now;
         state.lease_expires_ms = now.saturating_add(Self::session_ttl_ms());
-        if let Ok(mut locked) = self.metrics.lock() {
+        {
+            let mut locked = self.metrics.lock();
             locked.sessions_renewed = locked.sessions_renewed.saturating_add(1);
         }
         Ok(state.lease_expires_ms)
@@ -807,10 +789,7 @@ impl McpServer {
         payload: Value,
     ) -> Result<(u64, u64), SessionAccessError> {
         let now = now_ms();
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| SessionAccessError::Poisoned)?;
+        let mut sessions = self.sessions.lock();
         let expired = Self::cleanup_expired_sessions_locked(&mut sessions, now);
         self.record_session_expired(expired);
         let Some(state) = sessions.get_mut(session_id) else {
@@ -843,10 +822,7 @@ impl McpServer {
         ack_seq: Option<u64>,
     ) -> Result<SessionEventPage, SessionAccessError> {
         let now = now_ms();
-        let mut sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| SessionAccessError::Poisoned)?;
+        let mut sessions = self.sessions.lock();
         let expired = Self::cleanup_expired_sessions_locked(&mut sessions, now);
         self.record_session_expired(expired);
         let Some(state) = sessions.get_mut(session_id) else {
@@ -1257,10 +1233,7 @@ impl McpServer {
                 Err(msg) => return JsonRpcResponse::error(id, -32602, msg),
             };
 
-        let mut locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let mut locked = self.store.lock();
 
         let outcome = match store_layer_with_rules(
             &self.scopes,
@@ -1404,10 +1377,7 @@ impl McpServer {
             principle_payload = Some((principle_text, principle_importance, principle_level));
         }
 
-        let mut locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let mut locked = self.store.lock();
 
         let technical = match store_layer_with_rules(
             &self.scopes,
@@ -1513,10 +1483,7 @@ impl McpServer {
             None
         };
 
-        let locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let locked = self.store.lock();
 
         let local_start = Instant::now();
         let mut results = recall_with_acl(
@@ -1591,10 +1558,22 @@ impl McpServer {
             Err(resp) => return with_id(resp, id),
         };
 
-        let mut locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let mut locked = self.store.lock();
+
+        // Verify scope access before deletion
+        let entry = locked
+            .list(200_000)
+            .into_iter()
+            .find(|e| e.id == args.id);
+        if let Some(ref entry) = entry {
+            if !self.scopes.can_access_scope(&entry.scope) {
+                return JsonRpcResponse::error(
+                    id,
+                    -32603,
+                    format!("scope access denied for memory {}", args.id),
+                );
+            }
+        }
 
         let deleted = match locked.forget_by_id(&args.id) {
             Ok(v) => v,
@@ -1619,10 +1598,7 @@ impl McpServer {
         let governed = args
             .governed
             .unwrap_or_else(|| self.standards.default_governed_for_update());
-        let mut locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let mut locked = self.store.lock();
 
         let existing = locked.list(200_000).into_iter().find(|e| e.id == args.id);
         let Some(existing) = existing else {
@@ -1727,10 +1703,7 @@ impl McpServer {
 
         let limit = args.limit.unwrap_or(500).clamp(1, 20_000);
         let include_embeddings = args.include_embeddings.unwrap_or(false);
-        let locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let locked = self.store.lock();
         let rows = locked.list(200_000);
         drop(locked);
 
@@ -1747,21 +1720,32 @@ impl McpServer {
             }
         }
 
-        if let Some(path) = args.output_path {
+        if let Some(raw_path) = args.output_path {
+            let safe_path = match validate_safe_path(&raw_path) {
+                Ok(p) => p,
+                Err(err) => {
+                    return JsonRpcResponse::error(
+                        id,
+                        -32602,
+                        format!("invalid output path: {err}"),
+                    )
+                }
+            };
             let payload = json!({ "entries": items });
             let bytes = match serde_json::to_vec_pretty(&payload) {
                 Ok(v) => v,
                 Err(err) => return JsonRpcResponse::error(id, -32001, err.to_string()),
             };
-            if let Err(err) = fs::write(&path, bytes) {
+            if let Err(err) = fs::write(&safe_path, bytes) {
                 return JsonRpcResponse::error(id, -32001, err.to_string());
             }
+            let path_display = safe_path.display().to_string();
             return JsonRpcResponse::success(
                 id,
                 json!({
                     "structuredContent": {
                         "count": payload["entries"].as_array().map(|v| v.len()).unwrap_or(0),
-                        "output_path": path
+                        "output_path": path_display
                     },
                     "content": [{"type":"text","text":"memory export completed"}]
                 }),
@@ -1813,7 +1797,18 @@ impl McpServer {
             Err(resp) => return with_id(resp, id),
         };
 
-        let bytes = match fs::read(&args.source_path) {
+        let safe_path = match validate_safe_path(&args.source_path) {
+            Ok(p) => p,
+            Err(err) => {
+                return JsonRpcResponse::error(
+                    id,
+                    -32602,
+                    format!("invalid source path: {err}"),
+                )
+            }
+        };
+
+        let bytes = match fs::read(&safe_path) {
             Ok(v) => v,
             Err(err) => return JsonRpcResponse::error(id, -32001, err.to_string()),
         };
@@ -1866,10 +1861,7 @@ impl McpServer {
         }
         let limit = args.limit.unwrap_or(200).clamp(1, 5_000);
 
-        let locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let locked = self.store.lock();
         let rows = locked.list(200_000);
         drop(locked);
 
@@ -1896,10 +1888,7 @@ impl McpServer {
                 }
             };
 
-            let mut locked = match self.store.lock() {
-                Ok(v) => v,
-                Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-            };
+            let mut locked = self.store.lock();
             match locked.forget_by_id(&item.id) {
                 Ok(true) => {}
                 Ok(false) => {
@@ -1955,10 +1944,7 @@ impl McpServer {
         let limit = args.limit.unwrap_or(50_000).clamp(1, 200_000);
         let dry_run = args.dry_run.unwrap_or(true);
 
-        let locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let locked = self.store.lock();
         let rows = locked.list(200_000);
         drop(locked);
         let filtered = filter_entries_by_acl(
@@ -1987,10 +1973,7 @@ impl McpServer {
 
         let mut deleted = 0usize;
         if !dry_run {
-            let mut locked = match self.store.lock() {
-                Ok(v) => v,
-                Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-            };
+            let mut locked = self.store.lock();
             for mid in &duplicate_ids {
                 if matches!(locked.forget_by_id(mid), Ok(true)) {
                     deleted += 1;
@@ -2077,14 +2060,7 @@ impl McpServer {
                 None
             };
 
-            let mut locked = match self.store.lock() {
-                Ok(v) => v,
-                Err(_) => {
-                    failed += 1;
-                    errors.push(format!("entry#{idx}: storage lock poisoned"));
-                    continue;
-                }
-            };
+            let mut locked = self.store.lock();
             if options.skip_duplicates {
                 let similar = locked.recall(RecallQuery {
                     query: compact_query(&raw.text, 10),
@@ -2137,10 +2113,7 @@ impl McpServer {
             }
         }
 
-        let locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let locked = self.store.lock();
 
         let backend_stats = locked.stats();
         let rows = locked.list(200_000);
@@ -2202,10 +2175,7 @@ impl McpServer {
         let offset = args.offset.unwrap_or(0).min(20_000);
         let fetch = (offset + limit).min(200_000);
 
-        let locked = match self.store.lock() {
-            Ok(v) => v,
-            Err(_) => return JsonRpcResponse::error(id, -32000, "storage lock poisoned"),
-        };
+        let locked = self.store.lock();
 
         let rows = locked.list(fetch);
         let filtered = filter_entries_by_acl(
@@ -2418,6 +2388,10 @@ impl McpServer {
             return Ok(());
         };
         if self.is_sse_stream_request(&req) {
+            // Enforce auth on SSE streams
+            if let Some(rejection) = check_bearer_auth(&req) {
+                return write_http_response(&mut stream, rejection);
+            }
             return self.handle_http_stream_sse(&mut stream, req);
         }
         let response = self.dispatch_http_request(req);
@@ -2536,6 +2510,7 @@ impl McpServer {
     }
 
     fn dispatch_http_request(&self, req: HttpRequest) -> HttpResponse {
+        // Public endpoints (no auth required)
         if req.method == "GET" && req.path == "/health" {
             return HttpResponse::json(200, json!({"status":"ok"}));
         }
@@ -2550,6 +2525,11 @@ impl McpServer {
 
         if req.method == "GET" && req.path == "/metrics/summary" {
             return HttpResponse::json(200, self.render_metrics_summary());
+        }
+
+        // Authenticate all MCP endpoints when PRX_MEMORY_AUTH_TOKEN is configured
+        if let Some(rejection) = check_bearer_auth(&req) {
+            return rejection;
         }
 
         if req.method == "POST" && req.path == "/mcp/session/start" {
@@ -2718,12 +2698,6 @@ impl McpServer {
     }
 }
 
-impl Default for McpServer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 fn with_id(mut response: JsonRpcResponse, id: Value) -> JsonRpcResponse {
     response.id = id;
     response
@@ -2733,7 +2707,6 @@ fn session_error_code(err: SessionAccessError) -> &'static str {
     match err {
         SessionAccessError::NotFound => "session_not_found",
         SessionAccessError::Expired => "session_expired",
-        SessionAccessError::Poisoned => "session_internal_error",
     }
 }
 
@@ -2746,10 +2719,6 @@ fn session_error_response(err: SessionAccessError) -> HttpResponse {
         SessionAccessError::Expired => HttpResponse::json(
             410,
             json!({"error":"session_expired","message":"session lease expired"}),
-        ),
-        SessionAccessError::Poisoned => HttpResponse::json(
-            500,
-            json!({"error":"session_internal_error","message":"session lock poisoned"}),
         ),
     }
 }
@@ -2785,6 +2754,39 @@ impl HttpResponse {
             content_type,
             body: body.into_bytes(),
         }
+    }
+}
+
+/// Checks Bearer token authentication for protected HTTP endpoints.
+///
+/// If `PRX_MEMORY_AUTH_TOKEN` is set in the environment, validates the
+/// `Authorization: Bearer <token>` header against it. Returns `None` when
+/// auth passes (or when no token is configured), or `Some(HttpResponse)` with
+/// a 401 rejection.
+fn check_bearer_auth(req: &HttpRequest) -> Option<HttpResponse> {
+    static AUTH_TOKEN: OnceLock<Option<String>> = OnceLock::new();
+    let expected = AUTH_TOKEN.get_or_init(|| {
+        std::env::var("PRX_MEMORY_AUTH_TOKEN")
+            .ok()
+            .filter(|s| !s.is_empty())
+    });
+    let Some(expected_token) = expected else {
+        return None; // No token configured, allow all
+    };
+
+    let auth_header = req.headers.get("authorization");
+    let provided = auth_header
+        .and_then(|v| v.strip_prefix("Bearer ").or_else(|| v.strip_prefix("bearer ")));
+
+    match provided {
+        Some(token) if token == expected_token => None,
+        _ => Some(HttpResponse::json(
+            401,
+            json!({
+                "error": "unauthorized",
+                "message": "missing or invalid Bearer token in Authorization header"
+            }),
+        )),
     }
 }
 
@@ -2831,6 +2833,15 @@ fn read_http_request(stream: &TcpStream) -> io::Result<Option<HttpRequest>> {
                 content_length = value.trim().parse::<usize>().unwrap_or(0);
             }
         }
+    }
+
+    if content_length > MAX_HTTP_BODY_SIZE {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "request body too large ({content_length} bytes, max {MAX_HTTP_BODY_SIZE})"
+            ),
+        ));
     }
 
     let mut body = vec![0_u8; content_length];
@@ -3532,9 +3543,7 @@ fn store_layer_with_rules(
     }
 
     let should_trigger = {
-        let mut counter = auto_store_counter
-            .lock()
-            .map_err(|_| "auto maintenance lock poisoned".to_string())?;
+        let mut counter = auto_store_counter.lock();
         *counter = counter.saturating_add(1);
         req.allow_auto_maintenance && (*counter % 100 == 0)
     };
@@ -4175,16 +4184,15 @@ fn embed_one(text: &str, task: EmbeddingTask) -> Result<Vec<f32>, String> {
         text.trim().to_ascii_lowercase()
     );
 
-    if let Ok(mut runtime) = embed_runtime().lock() {
+    {
+        let mut runtime = embed_runtime().lock();
         if let Some(v) = runtime.cache_get(&key, now_ms()) {
             return Ok(v);
         }
     }
 
     let wait_ms = {
-        let mut runtime = embed_runtime()
-            .lock()
-            .map_err(|_| "embedding runtime lock poisoned".to_string())?;
+        let mut runtime = embed_runtime().lock();
         runtime.acquire_rate_limit(now_ms())
     };
     if wait_ms > 0 {
@@ -4214,7 +4222,8 @@ fn embed_one(text: &str, task: EmbeddingTask) -> Result<Vec<f32>, String> {
         .filter(|v| !v.is_empty())
         .ok_or_else(|| "vector embedding returned empty vector".to_string())?;
 
-    if let Ok(mut runtime) = embed_runtime().lock() {
+    {
+        let mut runtime = embed_runtime().lock();
         runtime.cache_put(key, vector.clone(), now_ms());
     }
     Ok(vector)
@@ -4619,7 +4628,14 @@ fn provider_error_en_rerank(err: &RerankProviderError) -> String {
 fn sanitize_sensitive(input: &str) -> String {
     let mut out = input.to_string();
 
-    for key_name in ["PRX_EMBED_API_KEY", "GEMINI_API_KEY", "JINA_API_KEY"] {
+    for key_name in [
+        "PRX_EMBED_API_KEY",
+        "GEMINI_API_KEY",
+        "JINA_API_KEY",
+        "PRX_RERANK_API_KEY",
+        "COHERE_API_KEY",
+        "PINECONE_API_KEY",
+    ] {
         if let Ok(secret) = std::env::var(key_name) {
             if !secret.is_empty() {
                 out = out.replace(&secret, "[REDACTED]");
@@ -4640,10 +4656,7 @@ fn embed_runtime() -> &'static Mutex<EmbedRuntime> {
 }
 
 fn embed_runtime_stats() -> EmbedRuntimeStats {
-    embed_runtime()
-        .lock()
-        .map(|v| v.stats.clone())
-        .unwrap_or_default()
+    embed_runtime().lock().stats.clone()
 }
 
 impl EmbedRuntime {
@@ -4746,6 +4759,88 @@ impl EmbedRuntime {
         self.lru.retain(|k| k != key);
         self.lru.push_back(key.to_string());
     }
+}
+
+/// Validates that a user-supplied file path is safe for read/write operations.
+///
+/// Rejects paths containing `..` path-traversal components.
+/// If `PRX_MEMORY_DATA_DIR` is set, ensures the resolved path resides within
+/// that directory. When `PRX_MEMORY_DATA_DIR` is not set, absolute paths are
+/// allowed as long as they contain no `..` traversal.
+fn validate_safe_path(raw: &str) -> Result<std::path::PathBuf, String> {
+    use std::path::{Component, Path, PathBuf};
+
+    if raw.is_empty() {
+        return Err("file path must not be empty".to_string());
+    }
+
+    let path = Path::new(raw);
+
+    // Reject any ".." components to prevent path traversal
+    for component in path.components() {
+        if matches!(component, Component::ParentDir) {
+            return Err("path traversal (..) is not allowed".to_string());
+        }
+    }
+
+    let data_dir = std::env::var("PRX_MEMORY_DATA_DIR")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from);
+
+    let resolved = match &data_dir {
+        Some(base) => {
+            if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                base.join(path)
+            }
+        }
+        None => {
+            if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                let cwd = std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."));
+                cwd.join(path)
+            }
+        }
+    };
+
+    // When a data directory is configured, enforce containment
+    if let Some(base) = &data_dir {
+        let parent = resolved.parent().unwrap_or(Path::new("/"));
+        let file_name = resolved
+            .file_name()
+            .ok_or_else(|| "invalid file path: no file name".to_string())?;
+
+        let canonical_parent = if parent.exists() {
+            parent
+                .canonicalize()
+                .map_err(|e| format!("failed to resolve parent directory: {e}"))?
+        } else {
+            parent.to_path_buf()
+        };
+
+        let canonical = canonical_parent.join(file_name);
+        let canonical_base = if base.exists() {
+            base.canonicalize()
+                .map_err(|e| format!("failed to resolve data directory: {e}"))?
+        } else {
+            base.clone()
+        };
+
+        if !canonical.starts_with(&canonical_base) {
+            return Err(format!(
+                "path must reside within the data directory ({})",
+                canonical_base.display()
+            ));
+        }
+
+        return Ok(canonical);
+    }
+
+    Ok(resolved)
 }
 
 fn now_ms() -> u64 {

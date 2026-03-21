@@ -20,20 +20,22 @@ impl GeminiEmbeddingProvider {
 
     fn embed_content_url(&self) -> String {
         format!(
-            "{}/v1beta/models/{}:embedContent?key={}",
+            "{}/v1beta/models/{}:embedContent",
             self.config.base_url.trim_end_matches('/'),
             self.config.model,
-            self.config.api_key
         )
     }
 
     fn batch_embed_url(&self) -> String {
         format!(
-            "{}/v1beta/models/{}:batchEmbedContents?key={}",
+            "{}/v1beta/models/{}:batchEmbedContents",
             self.config.base_url.trim_end_matches('/'),
             self.config.model,
-            self.config.api_key
         )
+    }
+
+    fn api_key_header_value(&self) -> &str {
+        &self.config.api_key
     }
 
     fn map_task(task: Option<EmbeddingTask>) -> Option<&'static str> {
@@ -75,6 +77,7 @@ impl EmbeddingProvider for GeminiEmbeddingProvider {
             let res = self
                 .client
                 .post(self.embed_content_url())
+                .header("x-goog-api-key", self.api_key_header_value())
                 .json(&payload)
                 .send()
                 .await?;
@@ -108,6 +111,7 @@ impl EmbeddingProvider for GeminiEmbeddingProvider {
         let res = self
             .client
             .post(self.batch_embed_url())
+            .header("x-goog-api-key", self.api_key_header_value())
             .json(&payload)
             .send()
             .await?;

@@ -16,6 +16,7 @@ prx-memory-embed = { path = "../prx-memory-embed" }
 prx-memory-rerank = { path = "../prx-memory-rerank" }
 prx-memory-skill = { path = "../prx-memory-skill" }
 prx-memory-storage = { path = "../prx-memory-storage" }
+parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

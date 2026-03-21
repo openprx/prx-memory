@@ -1,5 +1,5 @@
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::config::OpenAiCompatibleConfig;
@@ -131,9 +131,3 @@ struct Usage {
     total_tokens: Option<u64>,
 }
 
-#[derive(Debug, Serialize)]
-#[allow(dead_code)]
-struct OpenAiEmbeddingRequest<'a> {
-    model: &'a str,
-    input: &'a [String],
-}
