@@ -6,3 +6,6 @@ description = "Built-in governance skill payloads for prx-memory"
 license = "MIT"
 
 [dependencies]
+
+[lints]
+workspace = true

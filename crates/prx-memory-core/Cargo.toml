@@ -6,3 +6,6 @@ description = "Core scoring/evolution domain primitives for prx-memory"
 license = "MIT"
 
 [dependencies]
+
+[lints]
+workspace = true

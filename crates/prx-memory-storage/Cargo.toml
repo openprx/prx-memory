@@ -24,3 +24,6 @@ tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 arrow-array = { version = "57.3.0", optional = true }
 arrow-schema = { version = "57.3.0", optional = true }
 futures = { version = "0.3", optional = true }
+
+[lints]
+workspace = true
