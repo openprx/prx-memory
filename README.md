@@ -122,6 +122,11 @@ PRX_RERANK_MODEL=rerank-v3.5
 - `PRX_MEMORY_DEFAULT_TOOL_TAG` (default: `mcp`)
 - `PRX_MEMORY_DEFAULT_DOMAIN_TAG` (default: `general`)
 
+## Links
+
+- [Documentation](https://docs.openprx.dev/en/prx-memory/) — Full documentation (10 languages)
+- [Community](https://community.openprx.dev) — OpenPRX community forum
+
 ## Documentation Map
 
 See [docs/README.md](docs/README.md) for a categorized documentation index.
