@@ -1,7 +1,7 @@
 [package]
 name = "prx-memory-embed"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Embedding provider abstraction and adapters for prx-memory"
 license = "MIT"
 
