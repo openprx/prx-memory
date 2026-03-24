@@ -1,4 +1,4 @@
-use crate::mses::{select_candidate, EvolutionStepInput};
+use crate::mses::{EvolutionStepInput, select_candidate};
 
 #[derive(Debug, Clone)]
 pub struct VariantCandidate {
@@ -18,10 +18,7 @@ pub struct EvolutionPolicy {
 
 impl Default for EvolutionPolicy {
     fn default() -> Self {
-        Self {
-            lambda: 0.2,
-            mu: 0.2,
-        }
+        Self { lambda: 0.2, mu: 0.2 }
     }
 }
 
@@ -41,11 +38,7 @@ impl EvolutionRunner {
         Self { policy }
     }
 
-    pub fn run_generation(
-        &self,
-        parent_score: f32,
-        candidates: &[VariantCandidate],
-    ) -> EvolutionDecision {
+    pub fn run_generation(&self, parent_score: f32, candidates: &[VariantCandidate]) -> EvolutionDecision {
         let mut best: Option<(String, f32, &'static str)> = None;
 
         for candidate in candidates {
@@ -67,13 +60,7 @@ impl EvolutionRunner {
 
             match &best {
                 Some((_, score, _)) if decision.effective_score <= *score => {}
-                _ => {
-                    best = Some((
-                        candidate.id.clone(),
-                        decision.effective_score,
-                        decision.reason,
-                    ))
-                }
+                _ => best = Some((candidate.id.clone(), decision.effective_score, decision.reason)),
             }
         }
 

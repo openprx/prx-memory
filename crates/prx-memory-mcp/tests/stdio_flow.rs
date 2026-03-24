@@ -1,7 +1,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[test]
 fn memory_evolve_stdio_flow_works() {
@@ -65,9 +65,7 @@ fn memory_evolve_stdio_flow_works() {
 fn write_framed(stdin: &mut std::process::ChildStdin, payload: &Value) {
     let body = serde_json::to_vec(payload).expect("serialize payload");
     let frame = format!("Content-Length: {}\r\n\r\n", body.len());
-    stdin
-        .write_all(frame.as_bytes())
-        .expect("write frame header");
+    stdin.write_all(frame.as_bytes()).expect("write frame header");
     stdin.write_all(&body).expect("write frame body");
     stdin.flush().expect("flush frame");
 }
@@ -120,10 +118,7 @@ fn stdio_content_length_initialize_and_tools_list_work() {
         }),
     );
     let init = read_framed(&mut reader);
-    assert_eq!(
-        init["result"]["protocolVersion"].as_str(),
-        Some("2024-11-05")
-    );
+    assert_eq!(init["result"]["protocolVersion"].as_str(), Some("2024-11-05"));
     assert_eq!(
         init["result"]["capabilities"]["tools"]["listChanged"].as_bool(),
         Some(false)

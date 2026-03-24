@@ -28,10 +28,7 @@ impl OpenAiCompatibleEmbeddingProvider {
     }
 
     fn endpoint(&self) -> String {
-        format!(
-            "{}/v1/embeddings",
-            self.config.base_url.trim_end_matches('/')
-        )
+        format!("{}/v1/embeddings", self.config.base_url.trim_end_matches('/'))
     }
 }
 
@@ -43,22 +40,14 @@ impl EmbeddingProvider for OpenAiCompatibleEmbeddingProvider {
 
     async fn embed(&self, request: EmbeddingRequest) -> Result<EmbeddingResponse, ProviderError> {
         if request.inputs.is_empty() {
-            return Err(ProviderError::Config(
-                "embedding input is empty".to_string(),
-            ));
+            return Err(ProviderError::Config("embedding input is empty".to_string()));
         }
 
         let mut payload = Map::new();
-        payload.insert(
-            "model".to_string(),
-            Value::String(self.config.model.clone()),
-        );
+        payload.insert("model".to_string(), Value::String(self.config.model.clone()));
 
         if request.inputs.len() == 1 {
-            payload.insert(
-                "input".to_string(),
-                Value::String(request.inputs[0].clone()),
-            );
+            payload.insert("input".to_string(), Value::String(request.inputs[0].clone()));
         } else {
             payload.insert(
                 "input".to_string(),
@@ -95,9 +84,7 @@ impl EmbeddingProvider for OpenAiCompatibleEmbeddingProvider {
 
         let parsed: OpenAiEmbeddingResponse = res.json().await?;
         if parsed.data.is_empty() {
-            return Err(ProviderError::InvalidResponse(
-                "no embeddings in response".to_string(),
-            ));
+            return Err(ProviderError::InvalidResponse("no embeddings in response".to_string()));
         }
 
         let mut data = parsed.data;
@@ -130,4 +117,3 @@ struct EmbeddingItem {
 struct Usage {
     total_tokens: Option<u64>,
 }
-

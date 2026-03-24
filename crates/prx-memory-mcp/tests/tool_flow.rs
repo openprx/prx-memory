@@ -1,8 +1,8 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use prx_memory_mcp::protocol::JsonRpcRequest;
 use prx_memory_mcp::McpServer;
+use prx_memory_mcp::protocol::JsonRpcRequest;
 use serde_json::json;
 
 static TEMP_SEQ: AtomicU64 = AtomicU64::new(1);
@@ -256,9 +256,7 @@ fn resources_manifest_and_structured_tags_work() {
         method: "resources/list".to_string(),
         params: json!({}),
     };
-    let resources_list_resp = server
-        .handle_request(resources_list_req)
-        .expect("resources list");
+    let resources_list_resp = server.handle_request(resources_list_req).expect("resources list");
     let resources = resources_list_resp
         .result
         .as_ref()
@@ -266,10 +264,11 @@ fn resources_manifest_and_structured_tags_work() {
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
-    assert!(resources
-        .iter()
-        .any(|r| r.get("uri").and_then(|v| v.as_str())
-            == Some("prx://skills/prx-memory-governance/SKILL.md")));
+    assert!(
+        resources
+            .iter()
+            .any(|r| r.get("uri").and_then(|v| v.as_str()) == Some("prx://skills/prx-memory-governance/SKILL.md"))
+    );
 
     let templates_req = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
@@ -277,9 +276,7 @@ fn resources_manifest_and_structured_tags_work() {
         method: "resources/templates/list".to_string(),
         params: json!({}),
     };
-    let templates_resp = server
-        .handle_request(templates_req)
-        .expect("resources templates list");
+    let templates_resp = server.handle_request(templates_req).expect("resources templates list");
     let templates = templates_resp
         .result
         .as_ref()
@@ -298,9 +295,7 @@ fn resources_manifest_and_structured_tags_work() {
         method: "resources/read".to_string(),
         params: json!({"uri":"prx://skills/prx-memory-governance/SKILL.md"}),
     };
-    let resource_read_resp = server
-        .handle_request(resource_read_req)
-        .expect("resource read");
+    let resource_read_resp = server.handle_request(resource_read_req).expect("resource read");
     let text = resource_read_resp
         .result
         .as_ref()
@@ -318,9 +313,7 @@ fn resources_manifest_and_structured_tags_work() {
         method: "resources/read".to_string(),
         params: json!({"uri":"prx://templates/memory-store?text=Pitfall:+template+smoke&scope=global"}),
     };
-    let template_read_resp = server
-        .handle_request(template_read_req)
-        .expect("template read");
+    let template_read_resp = server.handle_request(template_read_req).expect("template read");
     let template_text = template_read_resp
         .result
         .as_ref()
@@ -448,11 +441,7 @@ fn governed_single_layer_store_is_rejected() {
         }),
     };
     let resp = server.handle_request(req).expect("response");
-    let err = resp
-        .error
-        .as_ref()
-        .map(|e| e.message.clone())
-        .unwrap_or_default();
+    let err = resp.error.as_ref().map(|e| e.message.clone()).unwrap_or_default();
     assert!(err.contains("memory_store_dual"));
 
     let _ = std::fs::remove_file(db_path);
@@ -771,9 +760,7 @@ fn dual_layer_store_tool_works() {
             "arguments":{"query":"hidden cache runtime compiled code","category":"decision","limit":3}
         }),
     };
-    let decision_resp = server
-        .handle_request(recall_decision)
-        .expect("decision recall");
+    let decision_resp = server.handle_request(recall_decision).expect("decision recall");
     let decision_count = decision_resp
         .result
         .as_ref()
@@ -812,14 +799,7 @@ fn auto_compact_runs_on_100th_store() {
 
     let duplicate_text = "Pitfall: duplicate payload cluster. Cause: repeated import path. Fix: compact dedup. Prevention: periodic cleanup.".to_string();
     for _ in 0..4 {
-        let _ = call_memory_store(
-            &server,
-            req_id,
-            duplicate_text.clone(),
-            "fact",
-            "medium",
-            false,
-        );
+        let _ = call_memory_store(&server, req_id, duplicate_text.clone(), "fact", "medium", false);
         req_id += 1;
     }
 

@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use prx_memory_storage::{recall_entries, MemoryEntry, RecallQuery};
+use prx_memory_storage::{MemoryEntry, RecallQuery, recall_entries};
 
 fn make_entries(n: usize) -> Vec<MemoryEntry> {
     let mut out = Vec::with_capacity(n);
@@ -14,9 +14,7 @@ fn make_entries(n: usize) -> Vec<MemoryEntry> {
         };
         out.push(MemoryEntry {
             id: format!("mem-{i}"),
-            text: format!(
-                "memory {i}: use {provider} embeddings for retrieval query ranking and governance"
-            ),
+            text: format!("memory {i}: use {provider} embeddings for retrieval query ranking and governance"),
             category: "fact".to_string(),
             scope: if i % 2 == 0 {
                 "global".to_string()
@@ -24,11 +22,7 @@ fn make_entries(n: usize) -> Vec<MemoryEntry> {
                 "project:alpha".to_string()
             },
             importance: ((i % 10) as f32) / 10.0,
-            tags: vec![
-                provider.to_string(),
-                "retrieval".to_string(),
-                "mcp".to_string(),
-            ],
+            tags: vec![provider.to_string(), "retrieval".to_string(), "mcp".to_string()],
             timestamp_ms: 1_700_000_000_000 + (i as u64 * 1000),
             embedding: None,
         });

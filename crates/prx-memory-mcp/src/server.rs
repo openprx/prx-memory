@@ -9,23 +9,21 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use prx_memory_core::{EvolutionPolicy, EvolutionRunner, VariantCandidate};
 use prx_memory_embed::{
-    build_embedding_provider, EmbeddingProviderConfig, EmbeddingRequest, EmbeddingTask,
-    GeminiConfig, OpenAiCompatibleConfig, ProviderError as EmbeddingProviderError,
+    EmbeddingProviderConfig, EmbeddingRequest, EmbeddingTask, GeminiConfig, OpenAiCompatibleConfig,
+    ProviderError as EmbeddingProviderError, build_embedding_provider,
 };
 use prx_memory_rerank::{
-    build_rerank_provider, CohereRerankConfig, JinaRerankConfig, PineconeRerankConfig,
-    ProviderError as RerankProviderError, RerankProviderConfig, RerankRequest,
+    CohereRerankConfig, JinaRerankConfig, PineconeRerankConfig, ProviderError as RerankProviderError,
+    RerankProviderConfig, RerankRequest, build_rerank_provider,
 };
-use prx_memory_skill::{
-    resource_text as skill_resource_text, resources as skill_resources, SKILL_ID,
-};
+use prx_memory_skill::{SKILL_ID, resource_text as skill_resource_text, resources as skill_resources};
 #[cfg(feature = "lancedb-backend")]
 use prx_memory_storage::LanceDbBackend;
 use prx_memory_storage::{
     MemoryEntry, NewMemoryEntry, PersistentMemoryStore, RecallQuery, RecallResult, StorageBackend,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse};
 
@@ -69,10 +67,7 @@ impl StandardizationConfig {
         let profile = match std::env::var("PRX_MEMORY_STANDARD_PROFILE") {
             Ok(v) => {
                 let lowered = v.trim().to_ascii_lowercase();
-                if matches!(
-                    lowered.as_str(),
-                    "governed" | "strict" | "production" | "prod"
-                ) {
+                if matches!(lowered.as_str(), "governed" | "strict" | "production" | "prod") {
                     StandardProfile::Governed
                 } else {
                     StandardProfile::ZeroConfig
@@ -220,18 +215,8 @@ impl MetricsRegistry {
         Self {
             tool: HashMap::new(),
             recall_stage: HashMap::new(),
-            recall_scope: BoundedLabelCounter::new(env_usize(
-                "PRX_METRICS_MAX_RECALL_SCOPE_LABELS",
-                32,
-                1,
-                256,
-            )),
-            recall_category: BoundedLabelCounter::new(env_usize(
-                "PRX_METRICS_MAX_RECALL_CATEGORY_LABELS",
-                32,
-                1,
-                256,
-            )),
+            recall_scope: BoundedLabelCounter::new(env_usize("PRX_METRICS_MAX_RECALL_SCOPE_LABELS", 32, 1, 256)),
+            recall_category: BoundedLabelCounter::new(env_usize("PRX_METRICS_MAX_RECALL_CATEGORY_LABELS", 32, 1, 256)),
             recall_rerank_provider: BoundedLabelCounter::new(env_usize(
                 "PRX_METRICS_MAX_RERANK_PROVIDER_LABELS",
                 16,
@@ -279,8 +264,7 @@ struct EmbedRuntime {
 
 impl McpServer {
     pub fn new() -> Result<Self, String> {
-        let db_path =
-            std::env::var("PRX_MEMORY_DB").unwrap_or_else(|_| "./data/memory-db.json".to_string());
+        let db_path = std::env::var("PRX_MEMORY_DB").unwrap_or_else(|_| "./data/memory-db.json".to_string());
         Self::with_db_path(db_path)
     }
 
@@ -353,9 +337,7 @@ impl McpServer {
             "tools/list" => JsonRpcResponse::success(id, self.tools_list_result()),
             "tools/call" => self.handle_tools_call(id, request.params),
             "resources/list" => JsonRpcResponse::success(id, self.resources_list_result()),
-            "resources/templates/list" => {
-                JsonRpcResponse::success(id, self.resources_templates_list_result())
-            }
+            "resources/templates/list" => JsonRpcResponse::success(id, self.resources_templates_list_result()),
             "resources/read" => self.handle_resources_read(id, request.params),
             _ => JsonRpcResponse::error(id, -32601, "method not found"),
         };
@@ -383,22 +365,11 @@ impl McpServer {
         metric.max_latency_ms = metric.max_latency_ms.max(latency_ms);
     }
 
-    fn record_recall_dimensions(
-        &self,
-        scope: Option<&str>,
-        category: Option<&str>,
-        rerank_provider: Option<&str>,
-    ) {
+    fn record_recall_dimensions(&self, scope: Option<&str>, category: Option<&str>, rerank_provider: Option<&str>) {
         let mut locked = self.metrics.lock();
-        locked
-            .recall_scope
-            .record(scope.unwrap_or("mixed_or_default_scope"));
-        locked
-            .recall_category
-            .record(category.unwrap_or("all_categories"));
-        locked
-            .recall_rerank_provider
-            .record(rerank_provider.unwrap_or("auto"));
+        locked.recall_scope.record(scope.unwrap_or("mixed_or_default_scope"));
+        locked.recall_category.record(category.unwrap_or("all_categories"));
+        locked.recall_rerank_provider.record(rerank_provider.unwrap_or("auto"));
     }
 
     fn record_remote_rerank_attempt(&self) {
@@ -430,8 +401,7 @@ impl McpServer {
             let mut locked = self.metrics.lock();
             match err {
                 SessionAccessError::NotFound | SessionAccessError::Expired => {
-                    locked.session_access_not_found =
-                        locked.session_access_not_found.saturating_add(1);
+                    locked.session_access_not_found = locked.session_access_not_found.saturating_add(1);
                 }
             }
         }
@@ -580,18 +550,9 @@ impl McpServer {
             ));
 
             lines.push(format!("prx_memory_sessions_active {}", active_sessions));
-            lines.push(format!(
-                "prx_memory_sessions_created_total {}",
-                locked.sessions_created
-            ));
-            lines.push(format!(
-                "prx_memory_sessions_renewed_total {}",
-                locked.sessions_renewed
-            ));
-            lines.push(format!(
-                "prx_memory_sessions_expired_total {}",
-                locked.sessions_expired
-            ));
+            lines.push(format!("prx_memory_sessions_created_total {}", locked.sessions_created));
+            lines.push(format!("prx_memory_sessions_renewed_total {}", locked.sessions_renewed));
+            lines.push(format!("prx_memory_sessions_expired_total {}", locked.sessions_expired));
             lines.push(format!(
                 "prx_memory_session_access_errors_total{{kind=\"not_found_or_expired\"}} {}",
                 locked.session_access_not_found
@@ -606,18 +567,14 @@ impl McpServer {
             } else {
                 total_errors as f64 / total_calls as f64
             };
-            lines.push(format!(
-                "prx_memory_tool_error_ratio {:.6}",
-                tool_error_ratio
-            ));
+            lines.push(format!("prx_memory_tool_error_ratio {:.6}", tool_error_ratio));
 
             let ratio_warn = env_f64("PRX_ALERT_TOOL_ERROR_RATIO_WARN", 0.05, 0.0, 1.0);
             let ratio_crit = env_f64("PRX_ALERT_TOOL_ERROR_RATIO_CRIT", 0.20, 0.0, 1.0);
             let remote_warn = env_f64("PRX_ALERT_REMOTE_WARNING_RATIO_WARN", 0.25, 0.0, 1.0);
             let remote_crit = env_f64("PRX_ALERT_REMOTE_WARNING_RATIO_CRIT", 0.60, 0.0, 1.0);
-            let label_overflow = locked.recall_scope.overflow
-                + locked.recall_category.overflow
-                + locked.recall_rerank_provider.overflow;
+            let label_overflow =
+                locked.recall_scope.overflow + locked.recall_category.overflow + locked.recall_rerank_provider.overflow;
 
             lines.push(format!(
                 "prx_memory_alert_state{{signal=\"tool_error_ratio\"}} {}",
@@ -634,10 +591,7 @@ impl McpServer {
         }
 
         let embed_stats = embed_runtime_stats();
-        lines.push(format!(
-            "prx_memory_embed_cache_hits_total {}",
-            embed_stats.cache_hits
-        ));
+        lines.push(format!("prx_memory_embed_cache_hits_total {}", embed_stats.cache_hits));
         lines.push(format!(
             "prx_memory_embed_cache_misses_total {}",
             embed_stats.cache_misses
@@ -661,9 +615,10 @@ impl McpServer {
         let active_sessions = self.sessions.lock().len();
         let locked = self.metrics.lock();
 
-        let (total_calls, total_errors) = locked.tool.values().fold((0_u64, 0_u64), |acc, m| {
-            (acc.0 + m.ok + m.err, acc.1 + m.err)
-        });
+        let (total_calls, total_errors) = locked
+            .tool
+            .values()
+            .fold((0_u64, 0_u64), |acc, m| (acc.0 + m.ok + m.err, acc.1 + m.err));
         let tool_error_ratio = if total_calls == 0 {
             0.0
         } else {
@@ -674,9 +629,8 @@ impl McpServer {
         } else {
             locked.remote_rerank_warnings as f64 / locked.remote_rerank_attempts as f64
         };
-        let label_overflow_total = locked.recall_scope.overflow
-            + locked.recall_category.overflow
-            + locked.recall_rerank_provider.overflow;
+        let label_overflow_total =
+            locked.recall_scope.overflow + locked.recall_category.overflow + locked.recall_rerank_provider.overflow;
         let ratio_warn = env_f64("PRX_ALERT_TOOL_ERROR_RATIO_WARN", 0.05, 0.0, 1.0);
         let ratio_crit = env_f64("PRX_ALERT_TOOL_ERROR_RATIO_CRIT", 0.20, 0.0, 1.0);
         let remote_warn = env_f64("PRX_ALERT_REMOTE_WARNING_RATIO_WARN", 0.25, 0.0, 1.0);
@@ -726,10 +680,7 @@ impl McpServer {
             .clamp(1_000, 86_400_000)
     }
 
-    fn cleanup_expired_sessions_locked(
-        sessions: &mut HashMap<String, SessionState>,
-        now: u64,
-    ) -> usize {
+    fn cleanup_expired_sessions_locked(sessions: &mut HashMap<String, SessionState>, now: u64) -> usize {
         let before = sessions.len();
         sessions.retain(|_, state| state.lease_expires_ms > now);
         before.saturating_sub(sessions.len())
@@ -783,11 +734,7 @@ impl McpServer {
         Ok(state.lease_expires_ms)
     }
 
-    fn append_session_event(
-        &self,
-        session_id: &str,
-        payload: Value,
-    ) -> Result<(u64, u64), SessionAccessError> {
+    fn append_session_event(&self, session_id: &str, payload: Value) -> Result<(u64, u64), SessionAccessError> {
         let now = now_ms();
         let mut sessions = self.sessions.lock();
         let expired = Self::cleanup_expired_sessions_locked(&mut sessions, now);
@@ -842,11 +789,7 @@ impl McpServer {
 
         state.last_touch_ms = now;
         state.lease_expires_ms = now.saturating_add(Self::session_ttl_ms());
-        let oldest_seq = state
-            .events
-            .front()
-            .map(|e| e.seq)
-            .unwrap_or(state.next_seq);
+        let oldest_seq = state.events.front().map(|e| e.seq).unwrap_or(state.next_seq);
         let effective_from = from_seq.max(oldest_seq);
         let events = state
             .events
@@ -1193,11 +1136,7 @@ impl McpServer {
             "memory_skill_manifest" => self.exec_memory_skill_manifest(id, parsed.arguments),
             _ => JsonRpcResponse::error(id, -32601, "unknown tool"),
         };
-        self.record_tool_metrics(
-            &tool,
-            start.elapsed().as_secs_f64() * 1000.0,
-            response.error.is_some(),
-        );
+        self.record_tool_metrics(&tool, start.elapsed().as_secs_f64() * 1000.0, response.error.is_some());
         response
     }
 
@@ -1227,11 +1166,11 @@ impl McpServer {
             &self.standards,
         );
         let target_scope = args.scope.unwrap_or_else(|| self.scopes.default_scope());
-        let (importance, importance_level) =
-            match resolve_importance(args.importance_level.as_deref(), args.importance) {
-                Ok(v) => v,
-                Err(msg) => return JsonRpcResponse::error(id, -32602, msg),
-            };
+        let (importance, importance_level) = match resolve_importance(args.importance_level.as_deref(), args.importance)
+        {
+            Ok(v) => v,
+            Err(msg) => return JsonRpcResponse::error(id, -32602, msg),
+        };
 
         let mut locked = self.store.lock();
 
@@ -1262,10 +1201,7 @@ impl McpServer {
             Err(_) => json!({}),
         };
         if let Some(obj) = structured_content.as_object_mut() {
-            obj.insert(
-                "auto_maintenance".to_string(),
-                json!(outcome.auto_maintenance),
-            );
+            obj.insert("auto_maintenance".to_string(), json!(outcome.auto_maintenance));
         }
 
         JsonRpcResponse::success(
@@ -1290,11 +1226,7 @@ impl McpServer {
         let use_vector = args.use_vector.unwrap_or(false);
         let include_principle = args.include_principle.unwrap_or(true);
         if governed && !include_principle {
-            return JsonRpcResponse::error(
-                id,
-                -32602,
-                "governed dual-layer writes require include_principle=true",
-            );
+            return JsonRpcResponse::error(id, -32602, "governed dual-layer writes require include_principle=true");
         }
         let scope = args.scope.unwrap_or_else(|| self.scopes.default_scope());
         let tags = normalize_tags_with_defaults(
@@ -1305,11 +1237,11 @@ impl McpServer {
             &self.standards,
         );
 
-        let (tech_importance, tech_level) =
-            match resolve_importance(args.tech_importance_level.as_deref(), Some(0.75)) {
-                Ok(v) => v,
-                Err(msg) => return JsonRpcResponse::error(id, -32602, msg),
-            };
+        let (tech_importance, tech_level) = match resolve_importance(args.tech_importance_level.as_deref(), Some(0.75))
+        {
+            Ok(v) => v,
+            Err(msg) => return JsonRpcResponse::error(id, -32602, msg),
+        };
 
         let tech_text = format!(
             "Pitfall: {}. Cause: {}. Fix: {}. Prevention: {}.",
@@ -1324,11 +1256,7 @@ impl McpServer {
             let principle_tag = match args.principle_tag {
                 Some(v) if !v.trim().is_empty() => v,
                 _ => {
-                    return JsonRpcResponse::error(
-                        id,
-                        -32602,
-                        "principle_tag is required when include_principle=true",
-                    )
+                    return JsonRpcResponse::error(id, -32602, "principle_tag is required when include_principle=true");
                 }
             };
             let principle_rule = match args.principle_rule {
@@ -1338,28 +1266,16 @@ impl McpServer {
                         id,
                         -32602,
                         "principle_rule is required when include_principle=true",
-                    )
+                    );
                 }
             };
             let trigger = match args.trigger {
                 Some(v) if !v.trim().is_empty() => v,
-                _ => {
-                    return JsonRpcResponse::error(
-                        id,
-                        -32602,
-                        "trigger is required when include_principle=true",
-                    )
-                }
+                _ => return JsonRpcResponse::error(id, -32602, "trigger is required when include_principle=true"),
             };
             let action = match args.action {
                 Some(v) if !v.trim().is_empty() => v,
-                _ => {
-                    return JsonRpcResponse::error(
-                        id,
-                        -32602,
-                        "action is required when include_principle=true",
-                    )
-                }
+                _ => return JsonRpcResponse::error(id, -32602, "action is required when include_principle=true"),
             };
             let (principle_importance, principle_level) =
                 match resolve_importance(args.principle_importance_level.as_deref(), Some(0.75)) {
@@ -1561,17 +1477,10 @@ impl McpServer {
         let mut locked = self.store.lock();
 
         // Verify scope access before deletion
-        let entry = locked
-            .list(200_000)
-            .into_iter()
-            .find(|e| e.id == args.id);
+        let entry = locked.list(200_000).into_iter().find(|e| e.id == args.id);
         if let Some(ref entry) = entry {
             if !self.scopes.can_access_scope(&entry.scope) {
-                return JsonRpcResponse::error(
-                    id,
-                    -32603,
-                    format!("scope access denied for memory {}", args.id),
-                );
+                return JsonRpcResponse::error(id, -32603, format!("scope access denied for memory {}", args.id));
             }
         }
 
@@ -1622,10 +1531,7 @@ impl McpServer {
         let (merged_importance, importance_level) =
             match resolve_importance(args.importance_level.as_deref(), args.importance) {
                 Ok((importance, level)) => (importance, level),
-                Err(_) => (
-                    existing.importance,
-                    importance_level_from_numeric(existing.importance),
-                ),
+                Err(_) => (existing.importance, importance_level_from_numeric(existing.importance)),
             };
         let merged_embedding = if merged_text != existing.text {
             match embed_one(&merged_text, EmbeddingTask::Passage) {
@@ -1639,20 +1545,12 @@ impl McpServer {
         if !self.scopes.can_access_scope(&merged_scope) {
             return JsonRpcResponse::error(id, -32602, "scope access denied for target scope");
         }
-        if let Some(msg) = self
-            .scopes
-            .validate_scope_write(&merged_scope, &merged_tags)
-        {
+        if let Some(msg) = self.scopes.validate_scope_write(&merged_scope, &merged_tags) {
             return JsonRpcResponse::error(id, -32602, msg);
         }
 
         if governed {
-            if let Err(msg) = validate_governed_input(
-                &merged_text,
-                &merged_category,
-                &merged_tags,
-                importance_level,
-            ) {
+            if let Err(msg) = validate_governed_input(&merged_text, &merged_category, &merged_tags, importance_level) {
                 return JsonRpcResponse::error(id, -32602, msg);
             }
         }
@@ -1707,12 +1605,7 @@ impl McpServer {
         let rows = locked.list(200_000);
         drop(locked);
 
-        let mut items = filter_entries_by_acl(
-            rows,
-            &self.scopes,
-            args.scope.as_deref(),
-            args.category.as_deref(),
-        );
+        let mut items = filter_entries_by_acl(rows, &self.scopes, args.scope.as_deref(), args.category.as_deref());
         items.truncate(limit);
         if !include_embeddings {
             for row in &mut items {
@@ -1723,13 +1616,7 @@ impl McpServer {
         if let Some(raw_path) = args.output_path {
             let safe_path = match validate_safe_path(&raw_path) {
                 Ok(p) => p,
-                Err(err) => {
-                    return JsonRpcResponse::error(
-                        id,
-                        -32602,
-                        format!("invalid output path: {err}"),
-                    )
-                }
+                Err(err) => return JsonRpcResponse::error(id, -32602, format!("invalid output path: {err}")),
             };
             let payload = json!({ "entries": items });
             let bytes = match serde_json::to_vec_pretty(&payload) {
@@ -1799,13 +1686,7 @@ impl McpServer {
 
         let safe_path = match validate_safe_path(&args.source_path) {
             Ok(p) => p,
-            Err(err) => {
-                return JsonRpcResponse::error(
-                    id,
-                    -32602,
-                    format!("invalid source path: {err}"),
-                )
-            }
+            Err(err) => return JsonRpcResponse::error(id, -32602, format!("invalid source path: {err}")),
         };
 
         let bytes = match fs::read(&safe_path) {
@@ -1823,9 +1704,7 @@ impl McpServer {
         let entries = match serde_json::from_slice::<MigratePayload>(&bytes) {
             Ok(MigratePayload::EntriesObj { entries }) => entries,
             Ok(MigratePayload::EntriesArray(entries)) => entries,
-            Err(err) => {
-                return JsonRpcResponse::error(id, -32602, format!("invalid migrate file: {err}"))
-            }
+            Err(err) => return JsonRpcResponse::error(id, -32602, format!("invalid migrate file: {err}")),
         };
 
         let options = ImportOptions {
@@ -1865,15 +1744,10 @@ impl McpServer {
         let rows = locked.list(200_000);
         drop(locked);
 
-        let targets = filter_entries_by_acl(
-            rows,
-            &self.scopes,
-            args.scope.as_deref(),
-            args.category.as_deref(),
-        )
-        .into_iter()
-        .take(limit)
-        .collect::<Vec<_>>();
+        let targets = filter_entries_by_acl(rows, &self.scopes, args.scope.as_deref(), args.category.as_deref())
+            .into_iter()
+            .take(limit)
+            .collect::<Vec<_>>();
 
         let mut updated = 0usize;
         let mut failed = 0usize;
@@ -1947,25 +1821,15 @@ impl McpServer {
         let locked = self.store.lock();
         let rows = locked.list(200_000);
         drop(locked);
-        let filtered = filter_entries_by_acl(
-            rows,
-            &self.scopes,
-            args.scope.as_deref(),
-            args.category.as_deref(),
-        )
-        .into_iter()
-        .take(limit)
-        .collect::<Vec<_>>();
+        let filtered = filter_entries_by_acl(rows, &self.scopes, args.scope.as_deref(), args.category.as_deref())
+            .into_iter()
+            .take(limit)
+            .collect::<Vec<_>>();
 
         let mut keep_keys = HashSet::new();
         let mut duplicate_ids = Vec::new();
         for row in filtered {
-            let key = format!(
-                "{}|{}|{}",
-                row.scope,
-                row.category,
-                compact_query(&row.text, 16)
-            );
+            let key = format!("{}|{}|{}", row.scope, row.category, compact_query(&row.text, 16));
             if !keep_keys.insert(key) {
                 duplicate_ids.push(row.id);
             }
@@ -1995,11 +1859,7 @@ impl McpServer {
         )
     }
 
-    fn import_entries(
-        &self,
-        entries: Vec<ImportedMemoryEntry>,
-        options: ImportOptions,
-    ) -> ImportSummary {
+    fn import_entries(&self, entries: Vec<ImportedMemoryEntry>, options: ImportOptions) -> ImportSummary {
         let mut created = 0usize;
         let mut skipped = 0usize;
         let mut failed = 0usize;
@@ -2036,9 +1896,7 @@ impl McpServer {
                 continue;
             }
             if options.governed {
-                if let Err(msg) =
-                    validate_governed_input(&raw.text, &category, &tags, importance_level)
-                {
+                if let Err(msg) = validate_governed_input(&raw.text, &category, &tags, importance_level) {
                     failed += 1;
                     errors.push(format!("entry#{idx}: {msg}"));
                     continue;
@@ -2178,17 +2036,8 @@ impl McpServer {
         let locked = self.store.lock();
 
         let rows = locked.list(fetch);
-        let filtered = filter_entries_by_acl(
-            rows,
-            &self.scopes,
-            args.scope.as_deref(),
-            args.category.as_deref(),
-        );
-        let items = filtered
-            .into_iter()
-            .skip(offset)
-            .take(limit)
-            .collect::<Vec<_>>();
+        let filtered = filter_entries_by_acl(rows, &self.scopes, args.scope.as_deref(), args.category.as_deref());
+        let items = filtered.into_iter().skip(offset).take(limit).collect::<Vec<_>>();
 
         JsonRpcResponse::success(
             id,
@@ -2270,14 +2119,16 @@ impl McpServer {
             .unwrap_or_default();
 
         let content = if include_content {
-            json!(skill_resources()
-                .iter()
-                .map(|resource| json!({
-                    "uri": resource.uri,
-                    "mimeType": resource.mime_type,
-                    "text": resource.text
-                }))
-                .collect::<Vec<_>>())
+            json!(
+                skill_resources()
+                    .iter()
+                    .map(|resource| json!({
+                        "uri": resource.uri,
+                        "mimeType": resource.mime_type,
+                        "text": resource.text
+                    }))
+                    .collect::<Vec<_>>()
+            )
         } else {
             Value::Null
         };
@@ -2319,11 +2170,8 @@ impl McpServer {
                 let content_length = match read_stdio_content_length(&mut reader, trimmed) {
                     Ok(v) => v,
                     Err(err) => {
-                        let response = JsonRpcResponse::error(
-                            Value::Null,
-                            -32700,
-                            format!("invalid stdio frame: {err}"),
-                        );
+                        let response =
+                            JsonRpcResponse::error(Value::Null, -32700, format!("invalid stdio frame: {err}"));
                         write_stdio_response(&mut stdout, &response, StdioFrame::LineDelimited)?;
                         continue;
                     }
@@ -2331,11 +2179,8 @@ impl McpServer {
 
                 let mut body = vec![0_u8; content_length];
                 if let Err(err) = reader.read_exact(&mut body) {
-                    let response = JsonRpcResponse::error(
-                        Value::Null,
-                        -32700,
-                        format!("invalid stdio frame body: {err}"),
-                    );
+                    let response =
+                        JsonRpcResponse::error(Value::Null, -32700, format!("invalid stdio frame body: {err}"));
                     write_stdio_response(&mut stdout, &response, StdioFrame::ContentLength)?;
                     continue;
                 }
@@ -2347,8 +2192,7 @@ impl McpServer {
             let request: JsonRpcRequest = match serde_json::from_slice(&payload) {
                 Ok(v) => v,
                 Err(err) => {
-                    let response =
-                        JsonRpcResponse::error(Value::Null, -32700, format!("parse error: {err}"));
+                    let response = JsonRpcResponse::error(Value::Null, -32700, format!("parse error: {err}"));
                     write_stdio_response(&mut stdout, &response, frame)?;
                     continue;
                 }
@@ -2364,10 +2208,7 @@ impl McpServer {
 
     pub fn serve_http(&self, addr: &str) -> io::Result<()> {
         let listener = TcpListener::bind(addr)?;
-        eprintln!(
-            "prx-memory-mcp http listening on {}",
-            listener.local_addr()?
-        );
+        eprintln!("prx-memory-mcp http listening on {}", listener.local_addr()?);
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
@@ -2426,11 +2267,7 @@ impl McpServer {
                 ),
             );
         };
-        let from = req
-            .query
-            .get("from")
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(1);
+        let from = req.query.get("from").and_then(|v| v.parse::<u64>().ok()).unwrap_or(1);
         let limit = req
             .query
             .get("limit")
@@ -2580,7 +2417,7 @@ impl McpServer {
                     return HttpResponse::json(
                         400,
                         json!({"jsonrpc":"2.0","id": Value::Null, "error":{"code":-32700,"message": format!("parse error: {err}")}}),
-                    )
+                    );
                 }
             };
             let payload = match self.handle_request(rpc) {
@@ -2590,7 +2427,7 @@ impl McpServer {
                         return HttpResponse::json(
                             500,
                             json!({"error":"internal_error","message":"failed to serialize rpc response"}),
-                        )
+                        );
                     }
                 },
                 None => json!({"jsonrpc":"2.0","id": Value::Null, "result": null}),
@@ -2605,7 +2442,7 @@ impl McpServer {
                             "seq": seq,
                             "lease_expires_ms": lease_expires_ms
                         }),
-                    )
+                    );
                 }
                 Err(err) => {
                     self.record_session_access_error(err);
@@ -2621,11 +2458,7 @@ impl McpServer {
                     json!({"error":"invalid_request","message":"missing query param: session"}),
                 );
             };
-            let from = req
-                .query
-                .get("from")
-                .and_then(|v| v.parse::<u64>().ok())
-                .unwrap_or(1);
+            let from = req.query.get("from").and_then(|v| v.parse::<u64>().ok()).unwrap_or(1);
             let limit = req
                 .query
                 .get("limit")
@@ -2679,7 +2512,7 @@ impl McpServer {
                 return HttpResponse::json(
                     400,
                     json!({"jsonrpc":"2.0","id": Value::Null, "error":{"code":-32700,"message": format!("parse error: {err}")}}),
-                )
+                );
             }
         };
         match self.handle_request(rpc) {
@@ -2690,10 +2523,7 @@ impl McpServer {
                     json!({"error":"internal_error","message":"failed to serialize rpc response"}),
                 ),
             },
-            None => HttpResponse::json(
-                204,
-                json!({"jsonrpc":"2.0","id": Value::Null, "result": null}),
-            ),
+            None => HttpResponse::json(204, json!({"jsonrpc":"2.0","id": Value::Null, "result": null})),
         }
     }
 }
@@ -2712,10 +2542,9 @@ fn session_error_code(err: SessionAccessError) -> &'static str {
 
 fn session_error_response(err: SessionAccessError) -> HttpResponse {
     match err {
-        SessionAccessError::NotFound => HttpResponse::json(
-            404,
-            json!({"error":"session_not_found","message":"unknown session id"}),
-        ),
+        SessionAccessError::NotFound => {
+            HttpResponse::json(404, json!({"error":"session_not_found","message":"unknown session id"}))
+        }
         SessionAccessError::Expired => HttpResponse::json(
             410,
             json!({"error":"session_expired","message":"session lease expired"}),
@@ -2765,18 +2594,13 @@ impl HttpResponse {
 /// a 401 rejection.
 fn check_bearer_auth(req: &HttpRequest) -> Option<HttpResponse> {
     static AUTH_TOKEN: OnceLock<Option<String>> = OnceLock::new();
-    let expected = AUTH_TOKEN.get_or_init(|| {
-        std::env::var("PRX_MEMORY_AUTH_TOKEN")
-            .ok()
-            .filter(|s| !s.is_empty())
-    });
+    let expected = AUTH_TOKEN.get_or_init(|| std::env::var("PRX_MEMORY_AUTH_TOKEN").ok().filter(|s| !s.is_empty()));
     let Some(expected_token) = expected else {
         return None; // No token configured, allow all
     };
 
     let auth_header = req.headers.get("authorization");
-    let provided = auth_header
-        .and_then(|v| v.strip_prefix("Bearer ").or_else(|| v.strip_prefix("bearer ")));
+    let provided = auth_header.and_then(|v| v.strip_prefix("Bearer ").or_else(|| v.strip_prefix("bearer ")));
 
     match provided {
         Some(token) if token == expected_token => None,
@@ -2838,9 +2662,7 @@ fn read_http_request(stream: &TcpStream) -> io::Result<Option<HttpRequest>> {
     if content_length > MAX_HTTP_BODY_SIZE {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!(
-                "request body too large ({content_length} bytes, max {MAX_HTTP_BODY_SIZE})"
-            ),
+            format!("request body too large ({content_length} bytes, max {MAX_HTTP_BODY_SIZE})"),
         ));
     }
 
@@ -2937,9 +2759,7 @@ fn sorted_counter(map: &HashMap<String, u64>) -> Vec<(String, u64)> {
 }
 
 fn prom_label_value(raw: &str) -> String {
-    raw.replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', " ")
+    raw.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ")
 }
 
 fn sanitize_label_value(raw: &str) -> String {
@@ -2954,11 +2774,7 @@ fn sanitize_label_value(raw: &str) -> String {
             break;
         }
     }
-    if out.is_empty() {
-        "unknown".to_string()
-    } else {
-        out
-    }
+    if out.is_empty() { "unknown".to_string() } else { out }
 }
 
 #[derive(Clone, Copy)]
@@ -2967,11 +2783,7 @@ enum StdioFrame {
     ContentLength,
 }
 
-fn write_stdio_response(
-    stdout: &mut io::Stdout,
-    response: &JsonRpcResponse,
-    frame: StdioFrame,
-) -> io::Result<()> {
+fn write_stdio_response(stdout: &mut io::Stdout, response: &JsonRpcResponse, frame: StdioFrame) -> io::Result<()> {
     match frame {
         StdioFrame::LineDelimited => {
             let serialized = serde_json::to_string(response)?;
@@ -3010,8 +2822,7 @@ fn read_stdio_content_length<R: BufRead>(reader: &mut R, first_line: &str) -> io
             content_length = Some(v);
         }
     }
-    content_length
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing content-length header"))
+    content_length.ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing content-length header"))
 }
 
 fn parse_content_length(line: &str) -> Option<usize> {
@@ -3048,40 +2859,20 @@ fn alert_level(value: f64, warn: f64, crit: f64) -> u8 {
     }
 }
 
-fn parse_args<T: for<'de> Deserialize<'de>>(
-    arguments: Option<Value>,
-) -> Result<T, JsonRpcResponse> {
+fn parse_args<T: for<'de> Deserialize<'de>>(arguments: Option<Value>) -> Result<T, JsonRpcResponse> {
     let args = match arguments {
         Some(v) => v,
-        None => {
-            return Err(JsonRpcResponse::error(
-                Value::Null,
-                -32602,
-                "missing tool arguments",
-            ))
-        }
+        None => return Err(JsonRpcResponse::error(Value::Null, -32602, "missing tool arguments")),
     };
 
-    serde_json::from_value(args).map_err(|err| {
-        JsonRpcResponse::error(
-            Value::Null,
-            -32602,
-            format!("invalid tool arguments: {err}"),
-        )
-    })
+    serde_json::from_value(args)
+        .map_err(|err| JsonRpcResponse::error(Value::Null, -32602, format!("invalid tool arguments: {err}")))
 }
 
-fn parse_args_optional<T: for<'de> Deserialize<'de> + Default>(
-    arguments: Option<Value>,
-) -> Result<T, JsonRpcResponse> {
+fn parse_args_optional<T: for<'de> Deserialize<'de> + Default>(arguments: Option<Value>) -> Result<T, JsonRpcResponse> {
     match arguments {
-        Some(v) => serde_json::from_value(v).map_err(|err| {
-            JsonRpcResponse::error(
-                Value::Null,
-                -32602,
-                format!("invalid tool arguments: {err}"),
-            )
-        }),
+        Some(v) => serde_json::from_value(v)
+            .map_err(|err| JsonRpcResponse::error(Value::Null, -32602, format!("invalid tool arguments: {err}"))),
         None => Ok(T::default()),
     }
 }
@@ -3116,8 +2907,7 @@ fn resource_templates() -> &'static [ResourceTemplateDef] {
         ResourceTemplateDef {
             uri_template: "prx://templates/memory-store{?text,category,scope,importance_level}",
             name: "template:memory-store",
-            description:
-                "Standardized memory_store payload template for zero-config and long-term usage.",
+            description: "Standardized memory_store payload template for zero-config and long-term usage.",
             mime_type: "application/json",
         },
         ResourceTemplateDef {
@@ -3458,10 +3248,7 @@ impl ScopeManager {
                     lower == "cross-domain" || lower == "root-cause:cross-domain"
                 });
                 if !cross_domain {
-                    return Some(
-                        "agent cannot write to other agent scope without cross-domain tag"
-                            .to_string(),
-                    );
+                    return Some("agent cannot write to other agent scope without cross-domain tag".to_string());
                 }
             }
         }
@@ -3571,12 +3358,7 @@ fn run_periodic_maintenance(
     if total_before > 1 {
         let mut groups: HashMap<String, Vec<MemoryEntry>> = HashMap::new();
         for row in before_rows {
-            let key = format!(
-                "{}|{}|{}",
-                row.scope,
-                row.category,
-                compact_query(&row.text, 16)
-            );
+            let key = format!("{}|{}|{}", row.scope, row.category, compact_query(&row.text, 16));
             groups.entry(key).or_default().push(row);
         }
 
@@ -3676,24 +3458,15 @@ fn run_periodic_maintenance(
     })
 }
 
-fn render_template_resource(
-    uri: &str,
-    standards: &StandardizationConfig,
-) -> Option<RenderedResource> {
+fn render_template_resource(uri: &str, standards: &StandardizationConfig) -> Option<RenderedResource> {
     let params = parse_uri_query(uri);
     if uri.starts_with("prx://templates/memory-store") {
         let text = params
             .get("text")
             .cloned()
             .unwrap_or_else(|| "Pitfall: .... Cause: .... Fix: .... Prevention: ....".to_string());
-        let category = params
-            .get("category")
-            .cloned()
-            .unwrap_or_else(|| "fact".to_string());
-        let scope = params
-            .get("scope")
-            .cloned()
-            .unwrap_or_else(|| "global".to_string());
+        let category = params.get("category").cloned().unwrap_or_else(|| "fact".to_string());
+        let scope = params.get("scope").cloned().unwrap_or_else(|| "global".to_string());
         let importance_level = params
             .get("importance_level")
             .cloned()
@@ -3728,18 +3501,9 @@ fn render_template_resource(
             .get("query")
             .cloned()
             .unwrap_or_else(|| "tool + error + symptom keywords".to_string());
-        let scope = params
-            .get("scope")
-            .cloned()
-            .unwrap_or_else(|| "global".to_string());
-        let category = params
-            .get("category")
-            .cloned()
-            .unwrap_or_else(|| "fact".to_string());
-        let limit = params
-            .get("limit")
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(5);
+        let scope = params.get("scope").cloned().unwrap_or_else(|| "global".to_string());
+        let category = params.get("category").cloned().unwrap_or_else(|| "fact".to_string());
+        let limit = params.get("limit").and_then(|v| v.parse::<usize>().ok()).unwrap_or(5);
         return Some(RenderedResource {
             mime_type: "application/json",
             text: json!({
@@ -3760,26 +3524,14 @@ fn render_template_resource(
         });
     }
     if uri.starts_with("prx://templates/memory-store-dual") {
-        let symptom = params
-            .get("symptom")
-            .cloned()
-            .unwrap_or_else(|| "symptom".to_string());
-        let cause = params
-            .get("cause")
-            .cloned()
-            .unwrap_or_else(|| "cause".to_string());
-        let fix = params
-            .get("fix")
-            .cloned()
-            .unwrap_or_else(|| "fix".to_string());
+        let symptom = params.get("symptom").cloned().unwrap_or_else(|| "symptom".to_string());
+        let cause = params.get("cause").cloned().unwrap_or_else(|| "cause".to_string());
+        let fix = params.get("fix").cloned().unwrap_or_else(|| "fix".to_string());
         let prevention = params
             .get("prevention")
             .cloned()
             .unwrap_or_else(|| "prevention".to_string());
-        let scope = params
-            .get("scope")
-            .cloned()
-            .unwrap_or_else(|| "global".to_string());
+        let scope = params.get("scope").cloned().unwrap_or_else(|| "global".to_string());
         return Some(RenderedResource {
             mime_type: "application/json",
             text: json!({
@@ -3847,10 +3599,7 @@ fn enforce_dual_layer() -> bool {
 
 fn infer_default_category(text: &str) -> &'static str {
     let lower = text.to_ascii_lowercase();
-    if lower.contains("pitfall:")
-        && lower.contains("cause:")
-        && lower.contains("fix:")
-        && lower.contains("prevention:")
+    if lower.contains("pitfall:") && lower.contains("cause:") && lower.contains("fix:") && lower.contains("prevention:")
     {
         return "fact";
     }
@@ -3875,16 +3624,10 @@ fn normalize_tags_with_defaults(
         ));
     }
     if !tags.iter().any(|t| t.starts_with("tool:")) {
-        tags.push(format!(
-            "tool:{}",
-            standards.default_tool_tag.to_ascii_lowercase()
-        ));
+        tags.push(format!("tool:{}", standards.default_tool_tag.to_ascii_lowercase()));
     }
     if !tags.iter().any(|t| t.starts_with("domain:")) {
-        tags.push(format!(
-            "domain:{}",
-            standards.default_domain_tag.to_ascii_lowercase()
-        ));
+        tags.push(format!("domain:{}", standards.default_domain_tag.to_ascii_lowercase()));
     }
     tags
 }
@@ -3945,16 +3688,13 @@ fn canonicalize_tag(tag: &str) -> String {
     }
     match trimmed.as_str() {
         "prx-memory" => "project:prx-memory".to_string(),
-        "mcp" | "lancedb" | "openai-compatible" | "jina" | "gemini" | "openclaw"
-        | "claude-code" | "codex" | "openprx" => format!("tool:{trimmed}"),
+        "mcp" | "lancedb" | "openai-compatible" | "jina" | "gemini" | "openclaw" | "claude-code" | "codex"
+        | "openprx" => format!("tool:{trimmed}"),
         _ => format!("domain:{trimmed}"),
     }
 }
 
-fn resolve_importance(
-    level: Option<&str>,
-    numeric: Option<f32>,
-) -> Result<(f32, &'static str), String> {
+fn resolve_importance(level: Option<&str>, numeric: Option<f32>) -> Result<(f32, &'static str), String> {
     if let Some(lv) = level {
         return match lv {
             "low" => Ok((0.25, "low")),
@@ -3979,10 +3719,7 @@ fn resolve_importance(
         if (s - 1.0).abs() < 1e-3 {
             return Ok((1.0, "critical"));
         }
-        return Err(
-            "numeric importance must be one of 0.25/0.50/0.75/1.0; prefer importance_level"
-                .to_string(),
-        );
+        return Err("numeric importance must be one of 0.25/0.50/0.75/1.0; prefer importance_level".to_string());
     }
 
     Ok((0.50, "medium"))
@@ -4000,12 +3737,7 @@ fn importance_level_from_numeric(v: f32) -> &'static str {
     }
 }
 
-fn validate_governed_input(
-    text: &str,
-    category: &str,
-    tags: &[String],
-    importance_level: &str,
-) -> Result<(), String> {
+fn validate_governed_input(text: &str, category: &str, tags: &[String], importance_level: &str) -> Result<(), String> {
     if text.trim().is_empty() {
         return Err("text cannot be empty".to_string());
     }
@@ -4097,11 +3829,7 @@ struct RecallAclRequest {
     lexical_weight: Option<f32>,
 }
 
-fn recall_with_acl(
-    store: &dyn StorageBackend,
-    access: &ScopeManager,
-    req: RecallAclRequest,
-) -> Vec<RecallResult> {
+fn recall_with_acl(store: &dyn StorageBackend, access: &ScopeManager, req: RecallAclRequest) -> Vec<RecallResult> {
     if let Some(scope) = req.requested_scope {
         if !access.can_access_scope(&scope) {
             return Vec::new();
@@ -4177,12 +3905,7 @@ fn embed_one(text: &str, task: EmbeddingTask) -> Result<Vec<f32>, String> {
     let provider_hint = std::env::var("PRX_EMBED_PROVIDER")
         .unwrap_or_else(|_| "openai-compatible".to_string())
         .to_ascii_lowercase();
-    let key = format!(
-        "{}|{:?}|{}",
-        provider_hint,
-        task,
-        text.trim().to_ascii_lowercase()
-    );
+    let key = format!("{}|{:?}|{}", provider_hint, task, text.trim().to_ascii_lowercase());
 
     {
         let mut runtime = embed_runtime().lock();
@@ -4200,8 +3923,7 @@ fn embed_one(text: &str, task: EmbeddingTask) -> Result<Vec<f32>, String> {
     }
 
     let provider = build_embedding_provider_from_env(None)?;
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| format!("vector runtime initialization failed: {e}"))?;
+    let rt = tokio::runtime::Runtime::new().map_err(|e| format!("vector runtime initialization failed: {e}"))?;
     let output = rt
         .block_on(async {
             provider
@@ -4253,12 +3975,8 @@ fn cross_encoder_rerank_with_remote(
     provider_hint: Option<&str>,
 ) -> Result<(), String> {
     let provider = build_rerank_provider_from_env(provider_hint)?;
-    let docs = results
-        .iter()
-        .map(|r| r.entry.text.clone())
-        .collect::<Vec<_>>();
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| format!("Cross-encoder runtime initialization failed: {e}"))?;
+    let docs = results.iter().map(|r| r.entry.text.clone()).collect::<Vec<_>>();
+    let rt = tokio::runtime::Runtime::new().map_err(|e| format!("Cross-encoder runtime initialization failed: {e}"))?;
     let res = rt
         .block_on(async {
             provider
@@ -4269,22 +3987,13 @@ fn cross_encoder_rerank_with_remote(
                 })
                 .await
         })
-        .map_err(|e| {
-            format!(
-                "Cross-encoder request failed: {}",
-                provider_error_en_rerank(&e)
-            )
-        })?;
+        .map_err(|e| format!("Cross-encoder request failed: {}", provider_error_en_rerank(&e)))?;
 
     if res.items.is_empty() {
         return Err("Cross-encoder returned empty results.".to_string());
     }
 
-    let max_local = results
-        .iter()
-        .map(|r| r.score)
-        .fold(0.0_f32, f32::max)
-        .max(1e-6);
+    let max_local = results.iter().map(|r| r.score).fold(0.0_f32, f32::max).max(1e-6);
     let mut cross_scores = vec![None::<f32>; results.len()];
     let mut min_s = f32::INFINITY;
     let mut max_s = f32::NEG_INFINITY;
@@ -4320,8 +4029,8 @@ fn semantic_rerank_with_embeddings(
     provider_hint: Option<&str>,
 ) -> Result<(), String> {
     let provider = build_embedding_provider_from_env(provider_hint)?;
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| format!("Third-party vector service initialization failed: {e}"))?;
+    let rt =
+        tokio::runtime::Runtime::new().map_err(|e| format!("Third-party vector service initialization failed: {e}"))?;
 
     let query_embedding = rt
         .block_on(async {
@@ -4334,17 +4043,9 @@ fn semantic_rerank_with_embeddings(
                 })
                 .await
         })
-        .map_err(|e| {
-            format!(
-                "Third-party vector request failed: {}",
-                provider_error_en_embed(&e)
-            )
-        })?;
+        .map_err(|e| format!("Third-party vector request failed: {}", provider_error_en_embed(&e)))?;
 
-    let doc_inputs = results
-        .iter()
-        .map(|r| r.entry.text.clone())
-        .collect::<Vec<_>>();
+    let doc_inputs = results.iter().map(|r| r.entry.text.clone()).collect::<Vec<_>>();
     let doc_embedding = rt
         .block_on(async {
             provider
@@ -4356,33 +4057,22 @@ fn semantic_rerank_with_embeddings(
                 })
                 .await
         })
-        .map_err(|e| {
-            format!(
-                "Third-party vector request failed: {}",
-                provider_error_en_embed(&e)
-            )
-        })?;
+        .map_err(|e| format!("Third-party vector request failed: {}", provider_error_en_embed(&e)))?;
 
     let q = query_embedding.vectors.first().ok_or_else(|| {
-        "Third-party vector service returned an empty result. Check model name and account quota."
-            .to_string()
+        "Third-party vector service returned an empty result. Check model name and account quota.".to_string()
     })?;
     if q.is_empty() {
-        return Err(
-            "Third-party vector dimension is empty. Check your model configuration.".to_string(),
-        );
+        return Err("Third-party vector dimension is empty. Check your model configuration.".to_string());
     }
 
-    let max_local = results
-        .iter()
-        .map(|r| r.score)
-        .fold(0.0_f32, f32::max)
-        .max(1e-6);
+    let max_local = results.iter().map(|r| r.score).fold(0.0_f32, f32::max).max(1e-6);
 
     for (i, item) in results.iter_mut().enumerate() {
-        let dv = doc_embedding.vectors.get(i).ok_or_else(|| {
-            "Third-party vector service returned inconsistent item count. Please retry.".to_string()
-        })?;
+        let dv = doc_embedding
+            .vectors
+            .get(i)
+            .ok_or_else(|| "Third-party vector service returned inconsistent item count. Please retry.".to_string())?;
         let cos = cosine_similarity(q, dv)?;
         let local = item.score / max_local;
         item.score = 0.4 * local + 0.6 * ((cos + 1.0) / 2.0);
@@ -4397,11 +4087,7 @@ fn build_rerank_provider_from_env(
 ) -> Result<Arc<dyn prx_memory_rerank::RerankProvider>, String> {
     let provider = provider_hint
         .map(|s| s.to_lowercase())
-        .or_else(|| {
-            std::env::var("PRX_RERANK_PROVIDER")
-                .ok()
-                .map(|s| s.to_lowercase())
-        })
+        .or_else(|| std::env::var("PRX_RERANK_PROVIDER").ok().map(|s| s.to_lowercase()))
         .unwrap_or_else(|| "jina".to_string());
 
     match provider.as_str() {
@@ -4411,7 +4097,8 @@ fn build_rerank_provider_from_env(
                 .or_else(|_| std::env::var("JINA_API_KEY"))
                 .or_else(|_| std::env::var("PRX_EMBED_API_KEY"))
                 .map_err(|_| {
-                    "PRX_RERANK_API_KEY/JINA_API_KEY/PRX_EMBED_API_KEY not configured for cross-encoder rerank.".to_string()
+                    "PRX_RERANK_API_KEY/JINA_API_KEY/PRX_EMBED_API_KEY not configured for cross-encoder rerank."
+                        .to_string()
                 })?;
             let mut cfg = JinaRerankConfig::new(api_key);
             if let Ok(model) = std::env::var("PRX_RERANK_MODEL") {
@@ -4420,20 +4107,13 @@ fn build_rerank_provider_from_env(
             if let Ok(endpoint) = std::env::var("PRX_RERANK_ENDPOINT") {
                 cfg.endpoint = endpoint;
             }
-            build_rerank_provider(RerankProviderConfig::Jina(cfg)).map_err(|e| {
-                format!(
-                    "Cross-encoder initialization failed: {}",
-                    provider_error_en_rerank(&e)
-                )
-            })
+            build_rerank_provider(RerankProviderConfig::Jina(cfg))
+                .map_err(|e| format!("Cross-encoder initialization failed: {}", provider_error_en_rerank(&e)))
         }
         "cohere" => {
             let api_key = std::env::var("PRX_RERANK_API_KEY")
                 .or_else(|_| std::env::var("COHERE_API_KEY"))
-                .map_err(|_| {
-                    "PRX_RERANK_API_KEY/COHERE_API_KEY not configured for Cohere rerank."
-                        .to_string()
-                })?;
+                .map_err(|_| "PRX_RERANK_API_KEY/COHERE_API_KEY not configured for Cohere rerank.".to_string())?;
             let mut cfg = CohereRerankConfig::new(api_key);
             if let Ok(model) = std::env::var("PRX_RERANK_MODEL") {
                 cfg.model = model;
@@ -4441,20 +4121,13 @@ fn build_rerank_provider_from_env(
             if let Ok(endpoint) = std::env::var("PRX_RERANK_ENDPOINT") {
                 cfg.endpoint = endpoint;
             }
-            build_rerank_provider(RerankProviderConfig::Cohere(cfg)).map_err(|e| {
-                format!(
-                    "Cohere rerank initialization failed: {}",
-                    provider_error_en_rerank(&e)
-                )
-            })
+            build_rerank_provider(RerankProviderConfig::Cohere(cfg))
+                .map_err(|e| format!("Cohere rerank initialization failed: {}", provider_error_en_rerank(&e)))
         }
         "pinecone" | "pinecone-compatible" => {
             let api_key = std::env::var("PRX_RERANK_API_KEY")
                 .or_else(|_| std::env::var("PINECONE_API_KEY"))
-                .map_err(|_| {
-                    "PRX_RERANK_API_KEY/PINECONE_API_KEY not configured for Pinecone rerank."
-                        .to_string()
-                })?;
+                .map_err(|_| "PRX_RERANK_API_KEY/PINECONE_API_KEY not configured for Pinecone rerank.".to_string())?;
             let mut cfg = PineconeRerankConfig::new(api_key);
             if let Ok(model) = std::env::var("PRX_RERANK_MODEL") {
                 cfg.model = model;
@@ -4472,10 +4145,7 @@ fn build_rerank_provider_from_env(
                 )
             })
         }
-        _ => Err(
-            "Unsupported rerank provider. Use jina, cohere, pinecone, pinecone-compatible, or none."
-                .to_string(),
-        ),
+        _ => Err("Unsupported rerank provider. Use jina, cohere, pinecone, pinecone-compatible, or none.".to_string()),
     }
 }
 
@@ -4484,21 +4154,14 @@ fn build_embedding_provider_from_env(
 ) -> Result<Arc<dyn prx_memory_embed::EmbeddingProvider>, String> {
     let provider = provider_hint
         .map(|s| s.to_lowercase())
-        .or_else(|| {
-            std::env::var("PRX_EMBED_PROVIDER")
-                .ok()
-                .map(|s| s.to_lowercase())
-        })
+        .or_else(|| std::env::var("PRX_EMBED_PROVIDER").ok().map(|s| s.to_lowercase()))
         .unwrap_or_else(|| "openai-compatible".to_string());
 
     match provider.as_str() {
         "openai-compatible" => {
-            let api_key = std::env::var("PRX_EMBED_API_KEY").map_err(|_| {
-                "PRX_EMBED_API_KEY is not configured. Remote semantic recall is disabled."
-                    .to_string()
-            })?;
-            let model = std::env::var("PRX_EMBED_MODEL")
-                .unwrap_or_else(|_| "text-embedding-3-small".to_string());
+            let api_key = std::env::var("PRX_EMBED_API_KEY")
+                .map_err(|_| "PRX_EMBED_API_KEY is not configured. Remote semantic recall is disabled.".to_string())?;
+            let model = std::env::var("PRX_EMBED_MODEL").unwrap_or_else(|_| "text-embedding-3-small".to_string());
             let mut cfg = OpenAiCompatibleConfig::new(api_key, model);
             if let Ok(base_url) = std::env::var("PRX_EMBED_BASE_URL") {
                 cfg.base_url = base_url;
@@ -4514,14 +4177,12 @@ fn build_embedding_provider_from_env(
             let api_key = std::env::var("PRX_EMBED_API_KEY")
                 .or_else(|_| std::env::var("JINA_API_KEY"))
                 .map_err(|_| {
-                    "PRX_EMBED_API_KEY or JINA_API_KEY is not configured. Jina recall is disabled."
-                        .to_string()
+                    "PRX_EMBED_API_KEY or JINA_API_KEY is not configured. Jina recall is disabled.".to_string()
                 })?;
-            let model = std::env::var("PRX_EMBED_MODEL")
-                .unwrap_or_else(|_| "jina-embeddings-v5-text-small".to_string());
+            let model =
+                std::env::var("PRX_EMBED_MODEL").unwrap_or_else(|_| "jina-embeddings-v5-text-small".to_string());
             let mut cfg = OpenAiCompatibleConfig::new(api_key, model);
-            cfg.base_url = std::env::var("PRX_EMBED_BASE_URL")
-                .unwrap_or_else(|_| "https://api.jina.ai".to_string());
+            cfg.base_url = std::env::var("PRX_EMBED_BASE_URL").unwrap_or_else(|_| "https://api.jina.ai".to_string());
             cfg.task_query = Some("retrieval.query".to_string());
             cfg.task_passage = Some("retrieval.passage".to_string());
             build_embedding_provider(EmbeddingProviderConfig::Jina(cfg)).map_err(|e| {
@@ -4535,11 +4196,9 @@ fn build_embedding_provider_from_env(
             let api_key = std::env::var("PRX_EMBED_API_KEY")
                 .or_else(|_| std::env::var("GEMINI_API_KEY"))
                 .map_err(|_| {
-                    "PRX_EMBED_API_KEY or GEMINI_API_KEY is not configured. Gemini recall is disabled."
-                        .to_string()
+                    "PRX_EMBED_API_KEY or GEMINI_API_KEY is not configured. Gemini recall is disabled.".to_string()
                 })?;
-            let model = std::env::var("PRX_EMBED_MODEL")
-                .unwrap_or_else(|_| "gemini-embedding-001".to_string());
+            let model = std::env::var("PRX_EMBED_MODEL").unwrap_or_else(|_| "gemini-embedding-001".to_string());
             let mut cfg = GeminiConfig::new(api_key, model);
             if let Ok(base_url) = std::env::var("PRX_EMBED_BASE_URL") {
                 cfg.base_url = base_url;
@@ -4558,8 +4217,7 @@ fn build_embedding_provider_from_env(
 fn cosine_similarity(a: &[f32], b: &[f32]) -> Result<f32, String> {
     if a.len() != b.len() {
         return Err(
-            "Third-party vector dimensions do not match. Check that query/document models are aligned."
-                .to_string(),
+            "Third-party vector dimensions do not match. Check that query/document models are aligned.".to_string(),
         );
     }
     let mut dot = 0.0_f32;
@@ -4585,18 +4243,12 @@ fn provider_error_en_embed(err: &EmbeddingProviderError) -> String {
         EmbeddingProviderError::Http(msg) => {
             format!("Network error: {}", sanitize_sensitive(&msg.to_string()))
         }
-        EmbeddingProviderError::Serde(msg) => format!(
-            "Serialization error: {}",
-            sanitize_sensitive(&msg.to_string())
-        ),
+        EmbeddingProviderError::Serde(msg) => format!("Serialization error: {}", sanitize_sensitive(&msg.to_string())),
         EmbeddingProviderError::InvalidResponse(msg) => {
             format!("Invalid provider response: {}", sanitize_sensitive(msg))
         }
         EmbeddingProviderError::Api { status, body } => {
-            format!(
-                "Provider API error (status {status}): {}",
-                sanitize_sensitive(body)
-            )
+            format!("Provider API error (status {status}): {}", sanitize_sensitive(body))
         }
     }
 }
@@ -4609,18 +4261,12 @@ fn provider_error_en_rerank(err: &RerankProviderError) -> String {
         RerankProviderError::Http(msg) => {
             format!("Network error: {}", sanitize_sensitive(&msg.to_string()))
         }
-        RerankProviderError::Serde(msg) => format!(
-            "Serialization error: {}",
-            sanitize_sensitive(&msg.to_string())
-        ),
+        RerankProviderError::Serde(msg) => format!("Serialization error: {}", sanitize_sensitive(&msg.to_string())),
         RerankProviderError::InvalidResponse(msg) => {
             format!("Invalid provider response: {}", sanitize_sensitive(msg))
         }
         RerankProviderError::Api { status, body } => {
-            format!(
-                "Provider API error (status {status}): {}",
-                sanitize_sensitive(body)
-            )
+            format!("Provider API error (status {status}): {}", sanitize_sensitive(body))
         }
     }
 }
@@ -4736,13 +4382,8 @@ impl EmbedRuntime {
 
     fn cache_put(&mut self, key: String, value: Vec<f32>, now: u64) {
         let expire_at_ms = now.saturating_add(self.ttl_ms);
-        self.entries.insert(
-            key.clone(),
-            EmbedCacheEntry {
-                value,
-                expire_at_ms,
-            },
-        );
+        self.entries
+            .insert(key.clone(), EmbedCacheEntry { value, expire_at_ms });
         self.bump_lru(&key);
         while self.entries.len() > self.capacity {
             if let Some(old) = self.lru.pop_front() {
@@ -4800,8 +4441,7 @@ fn validate_safe_path(raw: &str) -> Result<std::path::PathBuf, String> {
             if path.is_absolute() {
                 path.to_path_buf()
             } else {
-                let cwd = std::env::current_dir()
-                    .unwrap_or_else(|_| PathBuf::from("."));
+                let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
                 cwd.join(path)
             }
         }
@@ -4856,9 +4496,7 @@ fn redact_query_param(input: &str, marker: &str) -> String {
     while let Some(pos) = s[start..].find(marker) {
         let abs = start + pos + marker.len();
         let tail = &s[abs..];
-        let end_rel = tail
-            .find(['&', ' ', '"', '\'', ')', '\n'])
-            .unwrap_or(tail.len());
+        let end_rel = tail.find(['&', ' ', '"', '\'', ')', '\n']).unwrap_or(tail.len());
         s.replace_range(abs..abs + end_rel, "[REDACTED]");
         start = abs + "[REDACTED]".len();
     }

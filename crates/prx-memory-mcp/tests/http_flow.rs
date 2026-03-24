@@ -109,8 +109,7 @@ fn http_stream_session_and_metrics_work() {
 
     let start_resp = send_http(&addr, "POST", "/mcp/session/start", "{}");
     assert!(start_resp.starts_with("HTTP/1.1 200"));
-    let start_json: serde_json::Value =
-        serde_json::from_str(response_body(&start_resp)).expect("start json");
+    let start_json: serde_json::Value = serde_json::from_str(response_body(&start_resp)).expect("start json");
     let session_id = start_json
         .get("session_id")
         .and_then(|v| v.as_str())
@@ -118,12 +117,7 @@ fn http_stream_session_and_metrics_work() {
         .to_string();
 
     let init_body = r#"{"jsonrpc":"2.0","id":11,"method":"initialize","params":{}}"#;
-    let enqueue = send_http(
-        &addr,
-        "POST",
-        &format!("/mcp/stream?session={session_id}"),
-        init_body,
-    );
+    let enqueue = send_http(&addr, "POST", &format!("/mcp/stream?session={session_id}"), init_body);
     assert!(enqueue.starts_with("HTTP/1.1 202"));
 
     let poll = send_http(
@@ -152,12 +146,8 @@ fn http_stream_session_and_metrics_work() {
 
     let summary = send_http(&addr, "GET", "/metrics/summary", "");
     assert!(summary.starts_with("HTTP/1.1 200"));
-    let summary_json: serde_json::Value =
-        serde_json::from_str(response_body(&summary)).expect("summary");
-    assert_eq!(
-        summary_json.get("status").and_then(|v| v.as_str()),
-        Some("ok")
-    );
+    let summary_json: serde_json::Value = serde_json::from_str(response_body(&summary)).expect("summary");
+    assert_eq!(summary_json.get("status").and_then(|v| v.as_str()), Some("ok"));
     assert!(summary_json.get("overall_alert_level").is_some());
     assert!(summary_json.get("cardinality_limits").is_some());
 
@@ -191,8 +181,7 @@ fn http_stream_ack_and_sse_work() {
     wait_for_http(&addr);
 
     let start_resp = send_http(&addr, "POST", "/mcp/session/start", "{}");
-    let start_json: serde_json::Value =
-        serde_json::from_str(response_body(&start_resp)).expect("start json");
+    let start_json: serde_json::Value = serde_json::from_str(response_body(&start_resp)).expect("start json");
     let session_id = start_json
         .get("session_id")
         .and_then(|v| v.as_str())
@@ -201,18 +190,8 @@ fn http_stream_ack_and_sse_work() {
 
     let req1 = r#"{"jsonrpc":"2.0","id":21,"method":"initialize","params":{}}"#;
     let req2 = r#"{"jsonrpc":"2.0","id":22,"method":"tools/list","params":{}}"#;
-    let enqueue1 = send_http(
-        &addr,
-        "POST",
-        &format!("/mcp/stream?session={session_id}"),
-        req1,
-    );
-    let enqueue2 = send_http(
-        &addr,
-        "POST",
-        &format!("/mcp/stream?session={session_id}"),
-        req2,
-    );
+    let enqueue1 = send_http(&addr, "POST", &format!("/mcp/stream?session={session_id}"), req1);
+    let enqueue2 = send_http(&addr, "POST", &format!("/mcp/stream?session={session_id}"), req2);
     assert!(enqueue1.starts_with("HTTP/1.1 202"));
     assert!(enqueue2.starts_with("HTTP/1.1 202"));
 
@@ -224,14 +203,8 @@ fn http_stream_ack_and_sse_work() {
     );
     assert!(poll.starts_with("HTTP/1.1 200"));
     let poll_json: serde_json::Value = serde_json::from_str(response_body(&poll)).expect("poll");
-    assert_eq!(
-        poll_json.get("effective_from").and_then(|v| v.as_u64()),
-        Some(2)
-    );
-    assert_eq!(
-        poll_json.get("ack_applied").and_then(|v| v.as_u64()),
-        Some(1)
-    );
+    assert_eq!(poll_json.get("effective_from").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(poll_json.get("ack_applied").and_then(|v| v.as_u64()), Some(1));
     let events = poll_json
         .get("events")
         .and_then(|v| v.as_array())
@@ -243,9 +216,7 @@ fn http_stream_ack_and_sse_work() {
     let sse = send_http(
         &addr,
         "GET",
-        &format!(
-            "/mcp/stream?session={session_id}&mode=sse&from=2&limit=1&wait_ms=300&heartbeat_ms=100"
-        ),
+        &format!("/mcp/stream?session={session_id}&mode=sse&from=2&limit=1&wait_ms=300&heartbeat_ms=100"),
         "",
     );
     assert!(sse.starts_with("HTTP/1.1 200"));
@@ -286,8 +257,7 @@ fn http_stream_session_expiry_work() {
     wait_for_http(&addr);
 
     let start_resp = send_http(&addr, "POST", "/mcp/session/start", "{}");
-    let start_json: serde_json::Value =
-        serde_json::from_str(response_body(&start_resp)).expect("start json");
+    let start_json: serde_json::Value = serde_json::from_str(response_body(&start_resp)).expect("start json");
     let session_id = start_json
         .get("session_id")
         .and_then(|v| v.as_str())

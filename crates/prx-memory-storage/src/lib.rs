@@ -1,5 +1,5 @@
 use std::cmp::{Ordering, Reverse};
-use std::collections::{hash_map::DefaultHasher, BinaryHeap, HashSet};
+use std::collections::{BinaryHeap, HashSet, hash_map::DefaultHasher};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -9,17 +9,15 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[cfg(feature = "lancedb-backend")]
-use arrow_array::{
-    Array, Float32Array, RecordBatch, RecordBatchIterator, StringArray, UInt64Array,
-};
+use arrow_array::{Array, Float32Array, RecordBatch, RecordBatchIterator, StringArray, UInt64Array};
 #[cfg(feature = "lancedb-backend")]
 use arrow_schema::{DataType, Field, Schema, SchemaRef};
 #[cfg(feature = "lancedb-backend")]
 use futures::TryStreamExt;
 #[cfg(feature = "lancedb-backend")]
-use lancedb::query::{ExecutableQuery, QueryBase};
-#[cfg(feature = "lancedb-backend")]
 use lancedb::Table;
+#[cfg(feature = "lancedb-backend")]
+use lancedb::query::{ExecutableQuery, QueryBase};
 #[cfg(feature = "lancedb-backend")]
 use std::sync::Arc;
 
@@ -138,9 +136,7 @@ impl PersistentMemoryStore {
 
     pub fn store(&mut self, new_entry: NewMemoryEntry) -> Result<MemoryEntry, StorageError> {
         if new_entry.text.trim().is_empty() {
-            return Err(StorageError::InvalidInput(
-                "text cannot be empty".to_string(),
-            ));
+            return Err(StorageError::InvalidInput("text cannot be empty".to_string()));
         }
 
         let entry = MemoryEntry {
@@ -149,11 +145,7 @@ impl PersistentMemoryStore {
             category: new_entry.category,
             scope: new_entry.scope,
             importance: new_entry.importance.clamp(0.0, 1.0),
-            tags: new_entry
-                .tags
-                .into_iter()
-                .map(|t| t.to_lowercase())
-                .collect(),
+            tags: new_entry.tags.into_iter().map(|t| t.to_lowercase()).collect(),
             timestamp_ms: now_ms(),
             embedding: new_entry.embedding,
         };
@@ -236,9 +228,7 @@ impl LanceDbBackend {
             Err(_) => {
                 let schema = schema_ref();
                 rt.block_on(async { db.create_empty_table(&table_name, schema).execute().await })
-                    .map_err(|e| {
-                        StorageError::InvalidInput(format!("lancedb create table failed: {e}"))
-                    })?
+                    .map_err(|e| StorageError::InvalidInput(format!("lancedb create table failed: {e}")))?
             }
         };
 
@@ -286,8 +276,7 @@ impl LanceDbBackend {
                     importance: importances.map(|a| a.value(i)).unwrap_or(0.7),
                     tags: tags_vec,
                     timestamp_ms: timestamps.map(|a| a.value(i)).unwrap_or(0),
-                    embedding: embeddings
-                        .and_then(|a| serde_json::from_str::<Vec<f32>>(a.value(i)).ok()),
+                    embedding: embeddings.and_then(|a| serde_json::from_str::<Vec<f32>>(a.value(i)).ok()),
                 });
             }
         }
@@ -299,9 +288,7 @@ impl LanceDbBackend {
 impl StorageBackend for LanceDbBackend {
     fn store(&mut self, new_entry: NewMemoryEntry) -> Result<MemoryEntry, StorageError> {
         if new_entry.text.trim().is_empty() {
-            return Err(StorageError::InvalidInput(
-                "text cannot be empty".to_string(),
-            ));
+            return Err(StorageError::InvalidInput("text cannot be empty".to_string()));
         }
 
         let entry = MemoryEntry {
@@ -310,11 +297,7 @@ impl StorageBackend for LanceDbBackend {
             category: new_entry.category,
             scope: new_entry.scope,
             importance: new_entry.importance.clamp(0.0, 1.0),
-            tags: new_entry
-                .tags
-                .into_iter()
-                .map(|t| t.to_lowercase())
-                .collect(),
+            tags: new_entry.tags.into_iter().map(|t| t.to_lowercase()).collect(),
             timestamp_ms: now_ms(),
             embedding: new_entry.embedding,
         };
@@ -374,11 +357,7 @@ impl StorageBackend for LanceDbBackend {
         let escaped = escape_sql(id);
         let before = self
             .rt
-            .block_on(async {
-                self.table
-                    .count_rows(Some(format!("id = '{escaped}'")))
-                    .await
-            })
+            .block_on(async { self.table.count_rows(Some(format!("id = '{escaped}'"))).await })
             .map_err(|e| StorageError::InvalidInput(format!("lancedb count failed: {e}")))?;
 
         if before == 0 {
@@ -466,10 +445,7 @@ pub fn recall_entries(entries: &[MemoryEntry], query: RecallQuery) -> Vec<Recall
         return Vec::new();
     }
     let vector_weight = query.vector_weight.unwrap_or(0.6).clamp(0.0, 1.0);
-    let lexical_weight = query
-        .lexical_weight
-        .unwrap_or(1.0 - vector_weight)
-        .clamp(0.0, 1.0);
+    let lexical_weight = query.lexical_weight.unwrap_or(1.0 - vector_weight).clamp(0.0, 1.0);
 
     let candidates: Vec<usize> = entries
         .iter()
@@ -516,8 +492,7 @@ pub fn recall_entries(entries: &[MemoryEntry], query: RecallQuery) -> Vec<Recall
             let denom = tf + k1 * (1.0 - b + b * (doc_len / avg_anchor));
             bm25_local += (tf * (k1 + 1.0)) / denom.max(1e-6);
         }
-        let vector_score = if let (Some(qv), Some(dv)) = (&query.query_embedding, &entry.embedding)
-        {
+        let vector_score = if let (Some(qv), Some(dv)) = (&query.query_embedding, &entry.embedding) {
             cosine_similarity(qv, dv).unwrap_or(0.0)
         } else {
             0.0
@@ -639,18 +614,12 @@ fn term_frequency(entry: &MemoryEntry, term: &str) -> f32 {
     if term.is_empty() {
         return 0.0;
     }
-    if entry.text.contains(term) {
-        1.0
-    } else {
-        0.0
-    }
+    if entry.text.contains(term) { 1.0 } else { 0.0 }
 }
 
 fn cosine_similarity(a: &[f32], b: &[f32]) -> Result<f32, StorageError> {
     if a.len() != b.len() {
-        return Err(StorageError::InvalidInput(
-            "vector dimension mismatch".to_string(),
-        ));
+        return Err(StorageError::InvalidInput("vector dimension mismatch".to_string()));
     }
     let mut dot = 0.0_f32;
     let mut na = 0.0_f32;
@@ -691,11 +660,7 @@ fn signature(entry: &MemoryEntry) -> u64 {
     let mut hasher = DefaultHasher::new();
     entry.category.hash(&mut hasher);
     entry.scope.hash(&mut hasher);
-    entry
-        .text
-        .chars()
-        .take(120)
-        .for_each(|c| c.hash(&mut hasher));
+    entry.text.chars().take(120).for_each(|c| c.hash(&mut hasher));
     hasher.finish()
 }
 

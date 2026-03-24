@@ -34,10 +34,10 @@ fn holdout_cases_pass() {
         .join("holdout")
         .join("evolution_cases.json");
 
-    let content = fs::read_to_string(&fixture)
-        .unwrap_or_else(|e| panic!("failed to read fixture {}: {e}", fixture.display()));
-    let cases: Vec<Case> = serde_json::from_str(&content)
-        .unwrap_or_else(|e| panic!("failed to parse fixture {}: {e}", fixture.display()));
+    let content =
+        fs::read_to_string(&fixture).unwrap_or_else(|e| panic!("failed to read fixture {}: {e}", fixture.display()));
+    let cases: Vec<Case> =
+        serde_json::from_str(&content).unwrap_or_else(|e| panic!("failed to parse fixture {}: {e}", fixture.display()));
 
     for case in cases {
         let runner = EvolutionRunner::new(EvolutionPolicy {

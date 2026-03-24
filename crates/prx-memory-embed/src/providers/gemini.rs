@@ -61,9 +61,7 @@ impl EmbeddingProvider for GeminiEmbeddingProvider {
 
     async fn embed(&self, request: EmbeddingRequest) -> Result<EmbeddingResponse, ProviderError> {
         if request.inputs.is_empty() {
-            return Err(ProviderError::Config(
-                "embedding input is empty".to_string(),
-            ));
+            return Err(ProviderError::Config("embedding input is empty".to_string()));
         }
 
         if request.inputs.len() == 1 {
@@ -158,9 +156,7 @@ struct Content {
 impl Content {
     fn from_text(text: &str) -> Self {
         Self {
-            parts: vec![Part {
-                text: text.to_string(),
-            }],
+            parts: vec![Part { text: text.to_string() }],
         }
     }
 }

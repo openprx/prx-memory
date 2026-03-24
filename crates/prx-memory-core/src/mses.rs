@@ -74,9 +74,7 @@ pub fn select_candidate(step: &EvolutionStepInput) -> EvolutionStepResult {
         };
     }
 
-    let effective = step.candidate_score_holdout
-        - step.lambda * step.cost_penalty
-        - step.mu * step.risk_penalty;
+    let effective = step.candidate_score_holdout - step.lambda * step.cost_penalty - step.mu * step.risk_penalty;
     let train_improve = step.candidate_score_train > step.parent_score;
     let holdout_improve = step.candidate_score_holdout > step.parent_score;
 

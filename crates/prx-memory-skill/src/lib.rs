@@ -1,14 +1,12 @@
 pub const SKILL_ID: &str = "prx-memory-governance";
 pub const SKILL_MAIN_URI: &str = "prx://skills/prx-memory-governance/SKILL.md";
-pub const SKILL_GOVERNANCE_URI: &str =
-    "prx://skills/prx-memory-governance/references/memory-governance.md";
+pub const SKILL_GOVERNANCE_URI: &str = "prx://skills/prx-memory-governance/references/memory-governance.md";
 pub const SKILL_TAGS_URI: &str = "prx://skills/prx-memory-governance/references/tag-taxonomy.md";
 
 pub const SKILL_MAIN_TEXT: &str = include_str!("../../../skills/prx-memory-governance/SKILL.md");
 pub const SKILL_GOVERNANCE_TEXT: &str =
     include_str!("../../../skills/prx-memory-governance/references/memory-governance.md");
-pub const SKILL_TAGS_TEXT: &str =
-    include_str!("../../../skills/prx-memory-governance/references/tag-taxonomy.md");
+pub const SKILL_TAGS_TEXT: &str = include_str!("../../../skills/prx-memory-governance/references/tag-taxonomy.md");
 
 #[derive(Debug, Clone, Copy)]
 pub struct SkillResource {

@@ -27,9 +27,7 @@ impl RerankProvider for CohereRerankProvider {
 
     async fn rerank(&self, request: RerankRequest) -> Result<RerankResponse, ProviderError> {
         if request.documents.is_empty() {
-            return Err(ProviderError::Config(
-                "rerank documents is empty".to_string(),
-            ));
+            return Err(ProviderError::Config("rerank documents is empty".to_string()));
         }
 
         let documents = request
